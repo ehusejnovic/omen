@@ -1,8 +1,8 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use App\Models\GridScan;
+use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+Schedule::command('grid:scan')->hourly()->withoutOverlapping(15)->runInBackground();
+
+Schedule::command('model:prune', ['--model' => [GridScan::class]])->daily();

@@ -1,5 +1,11 @@
 import { Link } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-react';
+import {
+    BookOpen,
+    FolderGit2,
+    Grid3x3,
+    NotebookPen,
+    Settings2,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -14,13 +20,25 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { edit as editGridSettings } from '@/routes/grid-settings';
+import { index as journal } from '@/routes/grid-trades';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
     {
-        title: 'Dashboard',
+        title: 'Grid scanner',
         href: dashboard(),
-        icon: LayoutGrid,
+        icon: Grid3x3,
+    },
+    {
+        title: 'Trade journal',
+        href: journal(),
+        icon: NotebookPen,
+    },
+    {
+        title: 'Grid bot settings',
+        href: editGridSettings(),
+        icon: Settings2,
     },
 ];
 
