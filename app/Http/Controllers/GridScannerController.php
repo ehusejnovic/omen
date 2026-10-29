@@ -21,9 +21,10 @@ class GridScannerController extends Controller
         $suggestions = $latestScan?->suggestions()->orderByDesc('score')->orderBy('symbol')->get() ?? collect();
 
         return Inertia::render('dashboard', [
-            'scan' => $latestScan?->only(['id', 'symbols_scanned', 'suggestions_count', 'spacing_multiplier', 'started_at', 'finished_at']),
+            'scan' => $latestScan?->only(['id', 'symbols_scanned', 'suggestions_count', 'spacing_multiplier', 'range_horizon_days', 'started_at', 'finished_at']),
             'isScanning' => GridScan::query()->where('status', GridScan::StatusRunning)->where('started_at', '>', now()->subMinutes(15))->exists(),
             'totalMargin' => $request->user()->total_margin,
+            'rangeHorizonOptions' => config('grid.range_horizons'),
             'suggestions' => GridSuggestionResource::collection($suggestions)->resolve($request),
         ]);
     }

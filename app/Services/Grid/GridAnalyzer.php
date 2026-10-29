@@ -29,16 +29,17 @@ class GridAnalyzer
      * @param  float|null  $spacingMultiplier  Grid spacing as a multiple of the hourly ATR; defaults to the configured value.
      * @param  bool  $allowTrailing  Whether trend-following bots may be suggested with trailing up or trailing down.
      * @param  array{beta: float, correlation: float, shock_beta_down: float, shock_beta_up: float, shock_hours_down: int, shock_hours_up: int, btc_daily_volatility_pct: float, btc_shock_pct: float}|null  $btcSensitivity  From {@see BtcSensitivity::measure()}; enables the BTC shock stress test.
+     * @param  int|null  $rangeHorizonDays  Planned bot runtime in days; sizes the range, support/resistance lookback, take profit and trailing limit.
      * @return array<string, mixed>|null
      */
-    public function analyze(string $symbol, array $candles, array $market, ?float $spacingMultiplier = null, bool $allowTrailing = true, ?array $btcSensitivity = null): ?array
+    public function analyze(string $symbol, array $candles, array $market, ?float $spacingMultiplier = null, bool $allowTrailing = true, ?array $btcSensitivity = null, ?int $rangeHorizonDays = null): ?array
     {
         if (count($candles) < self::MinimumCandles || $market['last_price'] <= 0) {
             return null;
         }
 
         $fee = (float) config('grid.maker_fee');
-        $runtimeDays = (int) config('grid.runtime_days');
+        $runtimeDays = $rangeHorizonDays ?? (int) config('grid.range_horizon_days');
         $price = $market['last_price'];
 
         $closes = array_column($candles, 'close');
@@ -73,8 +74,9 @@ class GridAnalyzer
 
         $mode = $this->mode($adx, $efficiency, $trendSignal, $fastTrend, $slowTrend);
 
-        $support = Indicators::percentile(array_slice($lows, -self::HoursPerWeek), 5);
-        $resistance = Indicators::percentile(array_slice($highs, -self::HoursPerWeek), 95);
+        $zoneHours = $runtimeDays * 24;
+        $support = Indicators::percentile(array_slice($lows, -$zoneHours), 5);
+        $resistance = Indicators::percentile(array_slice($highs, -$zoneHours), 95);
         [$lower, $upper] = $this->range($mode, $price, $runtimeVolatility, $support, $resistance, $driftPerDay * $runtimeDays);
 
         $tickSize = $market['tick_size'] > 0 ? $market['tick_size'] : $price / 1e6;
@@ -246,6 +248,7 @@ class GridAnalyzer
                 'trend_signal' => round($trendSignal, 2),
                 'drift_per_day_pct' => round($driftPerDay * 100, 2),
                 'crossings_per_day' => round($crossingsPerDay, 1),
+                'range_horizon_days' => $runtimeDays,
                 'support' => $support,
                 'resistance' => $resistance,
                 'ema20_4h' => $fastTrend,

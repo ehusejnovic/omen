@@ -7,6 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { edit } from '@/routes/grid-settings';
 
 export default function GridSettings({
@@ -14,13 +21,18 @@ export default function GridSettings({
     spacingMultiplier,
     defaultSpacingMultiplier,
     allowTrailing,
+    rangeHorizonDays,
+    rangeHorizonOptions,
 }: {
     totalMargin: number;
     spacingMultiplier: number;
     defaultSpacingMultiplier: number;
     allowTrailing: boolean;
+    rangeHorizonDays: number;
+    rangeHorizonOptions: number[];
 }) {
     const [trailingAllowed, setTrailingAllowed] = useState(allowTrailing);
+    const [horizonDays, setHorizonDays] = useState(String(rangeHorizonDays));
 
     return (
         <>
@@ -108,6 +120,56 @@ export default function GridSettings({
                                 <InputError
                                     className="mt-2"
                                     message={errors.spacing_multiplier}
+                                />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="range_horizon_days">
+                                    Range horizon
+                                </Label>
+
+                                <input
+                                    type="hidden"
+                                    name="range_horizon_days"
+                                    value={horizonDays}
+                                />
+                                <Select
+                                    value={horizonDays}
+                                    onValueChange={setHorizonDays}
+                                >
+                                    <SelectTrigger
+                                        id="range_horizon_days"
+                                        className="mt-1 w-full"
+                                    >
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {rangeHorizonOptions.map((days) => (
+                                            <SelectItem
+                                                key={days}
+                                                value={String(days)}
+                                            >
+                                                {days} days
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                <p className="text-sm text-muted-foreground">
+                                    How long each bot is planned to run. It sets
+                                    how wide the range is, how far back support
+                                    and resistance are measured, the take
+                                    profit, and how far a trailing bot may
+                                    follow the price. Shorter horizons give
+                                    narrower ranges with more money in each
+                                    grid, but the price breaks out of them
+                                    sooner. This applies to every user, and
+                                    changing it starts a rescan.
+                                </p>
+
+                                <InputError
+                                    className="mt-2"
+                                    message={errors.range_horizon_days}
                                 />
                             </div>
 

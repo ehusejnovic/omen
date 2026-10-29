@@ -9,6 +9,7 @@ export type GridScan = {
     symbols_scanned: number;
     suggestions_count: number;
     spacing_multiplier: number | null;
+    range_horizon_days: number | null;
     started_at: string;
     finished_at: string | null;
 };
@@ -54,6 +55,7 @@ export type GridSuggestion = {
         trend_signal: number;
         drift_per_day_pct: number;
         crossings_per_day: number;
+        range_horizon_days?: number;
         support: number;
         resistance: number;
         ema20_4h: number;
@@ -88,6 +90,7 @@ export type GridTrade = {
     grid_count: number | null;
     trailing_up: boolean;
     trailing_down: boolean;
+    range_horizon_days: number | null;
     matched_trades: number;
     pnl: number | null;
     roi_pct: number | null;
@@ -117,4 +120,14 @@ export type JournalExposure = {
     measured_trades: number;
     unmeasured_symbols: string[];
     betas: Record<number, number>;
+};
+
+export type JournalHorizonResult = {
+    range_horizon_days: number | null;
+    trades: number;
+    closed_with_pnl: number;
+    total_pnl: number;
+    win_rate_pct: number | null;
+    average_roi_pct: number | null;
+    matched_per_day: number | null;
 };

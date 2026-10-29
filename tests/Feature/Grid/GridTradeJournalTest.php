@@ -23,6 +23,7 @@ function journalPayload(array $overrides = []): array
         'grid_count' => 40,
         'trailing_up' => true,
         'trailing_down' => false,
+        'range_horizon_days' => 5,
         'matched_trades' => 37,
         'pnl' => '-12.40',
         'started_at' => '2026-10-20T08:00:00.000Z',
@@ -95,6 +96,7 @@ it('journals a trade for the signed-in user', function () {
         ->and($trade->margin)->toBe(250.5)
         ->and($trade->trailing_up)->toBeTrue()
         ->and($trade->trailing_down)->toBeFalse()
+        ->and($trade->range_horizon_days)->toBe(5)
         ->and($trade->matched_trades)->toBe(37)
         ->and($trade->pnl)->toBe(-12.4)
         ->and($trade->started_at->toIso8601String())->toBe('2026-10-20T08:00:00+00:00')
@@ -121,6 +123,7 @@ it('journals a running trade with only the required fields', function () {
 
     expect($trade->ended_at)->toBeNull()
         ->and($trade->pnl)->toBeNull()
+        ->and($trade->range_horizon_days)->toBeNull()
         ->and($trade->lower_price)->toBeNull();
 });
 
@@ -141,6 +144,7 @@ it('rejects invalid trades', function (array $overrides, string $field) {
     'unknown bot mode' => [['mode' => 'hedge'], 'mode'],
     'invalid symbol' => [['symbol' => 'BTC/USDT'], 'symbol'],
     'missing trailing flag' => [['trailing_up' => null], 'trailing_up'],
+    'range horizon not offered' => [['range_horizon_days' => 4], 'range_horizon_days'],
 ]);
 
 it('updates the user\'s own trade', function () {
@@ -240,4 +244,36 @@ it('omits BTC exposure when no bots are running', function () {
     $this->actingAs($user)
         ->get(route('grid-trades.index'))
         ->assertInertia(fn (Assert $page) => $page->where('exposure', null));
+});
+
+it('compares results per range horizon, with trades without a horizon last', function () {
+    $this->freezeTime();
+    $user = User::factory()->create();
+    GridTrade::factory()->for($user)->create(['range_horizon_days' => null, 'margin' => 100, 'pnl' => 3, 'matched_trades' => 4, 'started_at' => now()->subDays(2), 'ended_at' => now()->subDay()]);
+    GridTrade::factory()->for($user)->create(['range_horizon_days' => 7, 'margin' => 100, 'matched_trades' => 6, 'pnl' => null, 'started_at' => now()->subHours(12), 'ended_at' => null]);
+    GridTrade::factory()->for($user)->create(['range_horizon_days' => 5, 'margin' => 100, 'pnl' => 10, 'matched_trades' => 20, 'started_at' => now()->subDays(3), 'ended_at' => now()->subDay()]);
+    GridTrade::factory()->for($user)->create(['range_horizon_days' => 5, 'margin' => 100, 'pnl' => -5, 'matched_trades' => 10, 'started_at' => now()->subDays(2), 'ended_at' => now()->subDay()]);
+    GridTrade::factory()->create(['range_horizon_days' => 3]);
+
+    $this->actingAs($user)
+        ->get(route('grid-trades.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('rangeHorizonOptions', [3, 5, 7])
+            ->has('byHorizon', 3)
+            ->where('byHorizon.0', [
+                'range_horizon_days' => 5,
+                'trades' => 2,
+                'closed_with_pnl' => 2,
+                'total_pnl' => 5,
+                'win_rate_pct' => 50,
+                'average_roi_pct' => 2.5,
+                'matched_per_day' => 10,
+            ])
+            ->where('byHorizon.1.range_horizon_days', 7)
+            ->where('byHorizon.1.closed_with_pnl', 0)
+            ->where('byHorizon.1.win_rate_pct', null)
+            ->where('byHorizon.1.matched_per_day', 12)
+            ->where('byHorizon.2.range_horizon_days', null)
+            ->where('byHorizon.2.average_roi_pct', 3)
+            ->where('byHorizon.2.matched_per_day', 4));
 });

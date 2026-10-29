@@ -166,14 +166,19 @@ it('keeps only the highest-scoring suggestions', function () {
         ->and($scan->suggestions()->pluck('symbol')->all())->toBe(['SWINGUSDT']);
 });
 
-it('records the spacing multiplier each scan was run with', function () {
+it('records the spacing multiplier and range horizon each scan was run with', function () {
     Http::preventStrayRequests();
     fakeBinanceMarket();
     AppSetting::setSpacingMultiplier(0.4);
+    AppSetting::setRangeHorizonDays(3);
 
     $this->artisan('grid:scan')->assertSuccessful();
 
-    expect(GridScan::query()->sole()->spacing_multiplier)->toBe(0.4);
+    $scan = GridScan::query()->sole();
+
+    expect($scan->spacing_multiplier)->toBe(0.4)
+        ->and($scan->range_horizon_days)->toBe(3)
+        ->and($scan->suggestions()->sole()->metrics['range_horizon_days'])->toBe(3);
 });
 
 it('suggests trailing only while trailing suggestions are allowed', function (bool $allowed) {

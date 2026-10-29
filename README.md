@@ -50,14 +50,29 @@ A full scan uses about 250 of Binance's 2,400-per-minute request weight and take
 
 All the logic lives in [`app/Services/Grid/GridAnalyzer.php`](app/Services/Grid/GridAnalyzer.php), and the indicators in [`app/Services/Grid/Indicators.php`](app/Services/Grid/Indicators.php). All tunable values are in [`config/grid.php`](config/grid.php).
 
-The bot is assumed to run for **7 days** (`runtime_days`). The range, take profit and margin are sized for that period.
+Each bot is planned to run for a **range horizon** of 3, 5 or 7 days. It defaults to 7 and is set in **Settings → Grid bot**, which applies to every user. Saving a new value starts a rescan, and each scan records the horizon it used, which the scanner shows under _Last scan_. The horizon sets four things:
+
+- how wide the range is
+- how far back support and resistance are measured
+- the take profit
+- how far a trailing bot may follow the price
+
+Volatility, ADX, the efficiency ratio and EMA crossings are always measured over the last 7 days, because they describe how the coin behaves, not how long the bot runs.
+
+| Horizon | Range                                 | Money per grid                | Breakouts                |
+| ------- | ------------------------------------- | ----------------------------- | ------------------------ |
+| 3 days  | about 65% as wide as 7 days (√3 ÷ √7) | more, so each fill earns more | sooner, so more restarts |
+| 5 days  | about 85% as wide as 7 days           | in between                    | in between               |
+| 7 days  | widest                                | least                         | rarest                   |
+
+The horizon doesn't change how often grids fill. That depends on the spacing; see [Number of grids and grid type](#4-number-of-grids-and-grid-type).
 
 ### 1. Volatility
 
 Grid bots make money from price swinging back and forth, so everything starts from how much the price moves:
 
 - **Daily volatility.** The standard deviation of the last 168 hourly log returns (one week), multiplied by √24.
-- **Runtime volatility.** Daily volatility × √7: the typical move over the bot's 7-day life. It is capped at 35% so meme coins don't produce absurd ranges.
+- **Runtime volatility.** Daily volatility × √(horizon days): the typical move over the bot's planned life. It is capped at 35% so meme coins don't produce absurd ranges.
 - **ATR (1h).** The average true range of the hourly candles, used to size the grid spacing and the stop buffer.
 
 ### 2. Bot type: Normal, Long or Short
@@ -79,11 +94,11 @@ Requiring the EMAs to agree with the drift stops the scanner from going long int
 
 ### 3. Lower and upper limit
 
-| Bot type   | Range                                                                                                                                                                                                                                                                                                         |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Normal** | Centred on the past week's trading zone, from the 5th percentile of hourly lows (support) to the 95th percentile of hourly highs (resistance). The half-width is kept between 1× and 2.5× runtime volatility. If the price is close to an edge, the range widens so the price sits inside with room to spare. |
-| **Long**   | Lower limit at the weekly support, but no deeper than 1.5× runtime volatility below the price. Upper limit 1.2–2.0× runtime volatility above the price, extended further when the uptrend is stronger.                                                                                                        |
-| **Short**  | The mirror image of Long.                                                                                                                                                                                                                                                                                     |
+| Bot type   | Range                                                                                                                                                                                                                                                                                                                                     |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Normal** | Centred on the recent trading zone, from the 5th percentile of hourly lows (support) to the 95th percentile of hourly highs (resistance), measured over the range horizon. The half-width is kept between 1× and 2.5× runtime volatility. If the price is close to an edge, the range widens so the price sits inside with room to spare. |
+| **Long**   | Lower limit at the support over the range horizon, but no deeper than 1.5× runtime volatility below the price. Upper limit 1.2–2.0× runtime volatility above the price, extended further when the uptrend is stronger.                                                                                                                    |
+| **Short**  | The mirror image of Long.                                                                                                                                                                                                                                                                                                                 |
 
 Both limits are rounded to the contract's tick size: the lower limit down, the upper limit up.
 
@@ -123,7 +138,7 @@ Directional bots often get 1–2x. Binance's Long and Short grids open a large p
     - Long bots pay positive funding on about half their position.
     - Short bots receive it.
     - Normal bots are treated as having no net position.
-- **Take profit (PnL)** = estimated daily ROI × 7 days. For Long and Short bots it adds half of the trend profit the bot would make if the price reached the far end of its range. It is kept between 3% and 150% of margin.
+- **Take profit (PnL)** = estimated daily ROI × horizon days. For Long and Short bots it adds half of the trend profit the bot would make if the price reached the far end of its range. It is kept between 3% and 150% of margin.
 
 ### 7. Entry trigger
 
@@ -213,26 +228,26 @@ The detail panel of each suggestion shows how its score breaks down, along with 
 
 These appear in the detail panel of each suggestion.
 
-| Metric                               | Meaning                                                                                                 | How to read it                                                                                                            |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| **Daily volatility**                 | The typical daily move: the standard deviation of hourly returns over 7 days × √24.                     | Grids like 2.5–6%. Below about 1% grids rarely fill; above about 10% breakouts are likely.                                |
-| **ATR (1h)**                         | The average true range of one hourly candle, as a percentage of the price.                              | Sets the grid spacing and the stop buffer.                                                                                |
-| **ADX (4h)**                         | Average Directional Index (14 periods) on 4h candles: how strong the trend is, whichever way it points. | Below 20: no trend. 25–40: healthy trend. Above 50: very strong or overextended.                                          |
-| **Efficiency ratio (7d)**            | Net price change ÷ total distance travelled, on 4h candles over 7 days.                                 | 0 means pure back-and-forth (ideal for Normal grids). 1 means a straight line.                                            |
-| **Mean crossings / day**             | How often the hourly close crosses its 20-hour EMA each day, averaged over the week.                    | Higher means more oscillation, so more grid fills.                                                                        |
-| **RSI (1h)**                         | 14-period Relative Strength Index.                                                                      | Above 70 is overbought, below 30 oversold. Used for the entry trigger and to keep Long and Short bots from chasing moves. |
-| **Drift / day**                      | The slope of a straight line fitted to the week's log prices, per day.                                  | The direction and pace of the trend.                                                                                      |
-| **Trend signal**                     | Drift per day ÷ daily volatility.                                                                       | Trend strength relative to the noise. A value of ±0.4 or more counts as trending.                                         |
-| **Support / resistance (7d)**        | The 5th percentile of hourly lows and the 95th percentile of hourly highs over 7 days.                  | The edges of the recent trading zone.                                                                                     |
-| **Breakout stop zone**               | The range limits extended by 1.5 × ATR.                                                                 | Where the stop loss PnL is expected to trigger.                                                                           |
-| **Funding rate**                     | The latest funding rate per funding interval (8h or 4h, depending on the contract).                     | Positive: longs pay shorts. Negative: shorts pay longs.                                                                   |
-| **Profit per grid**                  | Grid spacing minus round-trip maker fees.                                                               | What one completed buy and sell pair earns.                                                                               |
-| **Est. daily ROI**                   | Expected daily grid profit as a percentage of margin, after funding.                                    | An estimate from past movement, not a guarantee.                                                                          |
-| **Beta to BTC**                      | How much the coin moves for each 1% BTC moves, over about 3 weeks of hourly returns.                    | Above 1.5: high-beta alt. Close to 0: moves on its own news.                                                              |
-| **Correlation with BTC**             | How closely the coin's hourly returns follow BTC's, from −1 to 1.                                       | Information only; it rises towards 1 in crashes.                                                                          |
-| **Shock beta (BTC falls / rallies)** | Beta measured only in hours when BTC moved sharply; the number of hours used is shown in brackets.      | A fall beta above the overall beta means the coin falls harder in sell-offs.                                              |
-| **BTC shock stress test**            | Expected coin move and the bot's PnL if BTC suddenly moved by 2 × its daily volatility.                 | Must stay within −60% of margin; leverage is lowered if not.                                                              |
-| **Order size per grid**              | Margin × leverage ÷ number of grids, in USDT.                                                           | Must be at least the contract's minimum order size on Binance.                                                            |
+| Metric                               | Meaning                                                                                                            | How to read it                                                                                                            |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| **Daily volatility**                 | The typical daily move: the standard deviation of hourly returns over 7 days × √24.                                | Grids like 2.5–6%. Below about 1% grids rarely fill; above about 10% breakouts are likely.                                |
+| **ATR (1h)**                         | The average true range of one hourly candle, as a percentage of the price.                                         | Sets the grid spacing and the stop buffer.                                                                                |
+| **ADX (4h)**                         | Average Directional Index (14 periods) on 4h candles: how strong the trend is, whichever way it points.            | Below 20: no trend. 25–40: healthy trend. Above 50: very strong or overextended.                                          |
+| **Efficiency ratio (7d)**            | Net price change ÷ total distance travelled, on 4h candles over 7 days.                                            | 0 means pure back-and-forth (ideal for Normal grids). 1 means a straight line.                                            |
+| **Mean crossings / day**             | How often the hourly close crosses its 20-hour EMA each day, averaged over the week.                               | Higher means more oscillation, so more grid fills.                                                                        |
+| **RSI (1h)**                         | 14-period Relative Strength Index.                                                                                 | Above 70 is overbought, below 30 oversold. Used for the entry trigger and to keep Long and Short bots from chasing moves. |
+| **Drift / day**                      | The slope of a straight line fitted to the week's log prices, per day.                                             | The direction and pace of the trend.                                                                                      |
+| **Trend signal**                     | Drift per day ÷ daily volatility.                                                                                  | Trend strength relative to the noise. A value of ±0.4 or more counts as trending.                                         |
+| **Support / resistance**             | The 5th percentile of hourly lows and the 95th percentile of hourly highs over the range horizon (3, 5 or 7 days). | The edges of the recent trading zone.                                                                                     |
+| **Breakout stop zone**               | The range limits extended by 1.5 × ATR.                                                                            | Where the stop loss PnL is expected to trigger.                                                                           |
+| **Funding rate**                     | The latest funding rate per funding interval (8h or 4h, depending on the contract).                                | Positive: longs pay shorts. Negative: shorts pay longs.                                                                   |
+| **Profit per grid**                  | Grid spacing minus round-trip maker fees.                                                                          | What one completed buy and sell pair earns.                                                                               |
+| **Est. daily ROI**                   | Expected daily grid profit as a percentage of margin, after funding.                                               | An estimate from past movement, not a guarantee.                                                                          |
+| **Beta to BTC**                      | How much the coin moves for each 1% BTC moves, over about 3 weeks of hourly returns.                               | Above 1.5: high-beta alt. Close to 0: moves on its own news.                                                              |
+| **Correlation with BTC**             | How closely the coin's hourly returns follow BTC's, from −1 to 1.                                                  | Information only; it rises towards 1 in crashes.                                                                          |
+| **Shock beta (BTC falls / rallies)** | Beta measured only in hours when BTC moved sharply; the number of hours used is shown in brackets.                 | A fall beta above the overall beta means the coin falls harder in sell-offs.                                              |
+| **BTC shock stress test**            | Expected coin move and the bot's PnL if BTC suddenly moved by 2 × its daily volatility.                            | Must stay within −60% of margin; leverage is lowered if not.                                                              |
+| **Order size per grid**              | Margin × leverage ÷ number of grids, in USDT.                                                                      | Must be at least the contract's minimum order size on Binance.                                                            |
 
 ---
 
@@ -245,6 +260,7 @@ Each entry stores:
 - symbol, bot type and the grade it was suggested with
 - margin, leverage, range and number of grids
 - whether trailing up or trailing down was on
+- the range horizon (3, 5 or 7 days, or not set), filled in from the suggestion
 - **matched trades**: the completed buy/sell pairs, called the arbitrage count on Binance
 - **PnL** in USDT
 - start and end time, with the **duration** worked out from them (leave the end time empty while the bot is running)
@@ -255,6 +271,8 @@ The summary shows:
 - **Total PnL and win rate**, counting finished trades that have a PnL.
 - **Total matched trades**, counting every trade.
 - **Average duration**, counting finished trades.
+
+**By range horizon.** A table compares horizons side by side: number of trades, total PnL, win rate, average ROI (PnL ÷ margin) and matched trades per day. Total PnL, win rate and ROI count finished trades with a PnL. Matched trades per day counts every trade, running ones up to now. Trades without a horizon are grouped as _Not set_.
 
 **BTC exposure of running bots.** When any bots are running, the journal estimates how they would react together to a sudden BTC move. Code: [`app/Services/Grid/PortfolioExposure.php`](app/Services/Grid/PortfolioExposure.php).
 
@@ -279,7 +297,8 @@ Each user sees and edits only their own entries.
 | ------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `symbols` (`GRID_SCAN_SYMBOLS`) | 100                  | How many of the most liquid perpetuals to scan.                                                                              |
 | `results` (`GRID_SCAN_RESULTS`) | 30                   | How many of the best-scoring suggestions to keep.                                                                            |
-| `runtime_days`                  | 7                    | Planned bot runtime the range and take profit are sized for.                                                                 |
+| `range_horizon_days`            | 7                    | Default range horizon. **Settings → Grid bot** overrides it (stored in the `app_settings` table).                            |
+| `range_horizons`                | 3, 5, 7              | Range horizons offered in settings.                                                                                          |
 | `max_leverage`                  | 10                   | Overall leverage cap.                                                                                                        |
 | `max_stop_loss`                 | 0.25                 | Share of margin the stop loss may lose at a breakout.                                                                        |
 | `spacing_multiplier`            | 0.6                  | Default grid spacing as a multiple of hourly ATR. **Settings → Grid bot** overrides it (stored in the `app_settings` table). |

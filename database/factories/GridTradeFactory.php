@@ -30,6 +30,7 @@ class GridTradeFactory extends Factory
             'grid_count' => 40,
             'trailing_up' => false,
             'trailing_down' => false,
+            'range_horizon_days' => null,
             'matched_trades' => 25,
             'pnl' => 4.5,
             'started_at' => now()->subDays(3),

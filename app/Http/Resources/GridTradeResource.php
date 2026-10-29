@@ -30,6 +30,7 @@ class GridTradeResource extends JsonResource
             'grid_count' => $this->grid_count,
             'trailing_up' => $this->trailing_up,
             'trailing_down' => $this->trailing_down,
+            'range_horizon_days' => $this->range_horizon_days,
             'matched_trades' => $this->matched_trades,
             'pnl' => $this->pnl,
             'roi_pct' => $this->pnl === null ? null : round($this->pnl / $this->margin * 100, 2),

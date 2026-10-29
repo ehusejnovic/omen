@@ -26,8 +26,11 @@ return [
 
     'maker_fee' => 0.0002,
 
-    // Planned bot runtime the range, take profit and allocation are sized for.
-    'runtime_days' => 7,
+    // Default planned bot runtime in days, which sizes the range, the support/resistance lookback,
+    // the take profit and the trailing limit; adjustable in Settings → Grid bot.
+    'range_horizon_days' => 7,
+
+    'range_horizons' => [3, 5, 7],
 
     'max_leverage' => 10,
 

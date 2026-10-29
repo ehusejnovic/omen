@@ -37,9 +37,11 @@ class GridScanner
     {
         $spacingMultiplier = AppSetting::spacingMultiplier();
         $allowTrailing = AppSetting::allowsTrailing();
+        $rangeHorizonDays = AppSetting::rangeHorizonDays();
         $scan = GridScan::create([
             'status' => GridScan::StatusRunning,
             'spacing_multiplier' => $spacingMultiplier,
+            'range_horizon_days' => $rangeHorizonDays,
             'started_at' => now(),
         ]);
 
@@ -88,7 +90,7 @@ class GridScanner
                     'funding_rate' => $fundingRates[$symbol] ?? 0.0,
                     'tick_size' => $contracts[$symbol]['tick_size'],
                     'min_notional' => $contracts[$symbol]['min_notional'],
-                ], $spacingMultiplier, $allowTrailing, $sensitivity);
+                ], $spacingMultiplier, $allowTrailing, $sensitivity, $rangeHorizonDays);
 
                 if ($suggestion !== null) {
                     $suggestions[] = $suggestion;

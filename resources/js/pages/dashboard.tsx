@@ -67,11 +67,13 @@ export default function Dashboard({
     scan,
     isScanning,
     totalMargin,
+    rangeHorizonOptions,
     suggestions,
 }: {
     scan: GridScan | null;
     isScanning: boolean;
     totalMargin: number;
+    rangeHorizonOptions: number[];
     suggestions: GridSuggestion[];
 }) {
     const [mode, setMode] = useState<ModeFilter>('all');
@@ -162,7 +164,7 @@ export default function Dashboard({
                                 ? formatRelative(scan.finished_at)
                                 : 'Never'
                         }
-                        hint={`${scan?.spacing_multiplier ? `Spacing ${scan.spacing_multiplier}× ATR · ` : ''}next scan ${nextScanLabel()}`}
+                        hint={`${scan?.spacing_multiplier ? `Spacing ${scan.spacing_multiplier}× ATR · ` : ''}${scan?.range_horizon_days ? `${scan.range_horizon_days}-day range · ` : ''}next scan ${nextScanLabel()}`}
                     />
                     <StatCard
                         label="Total margin"
@@ -438,6 +440,7 @@ export default function Dashboard({
                 open={journaling !== null}
                 onOpenChange={(open) => !open && setJournaling(null)}
                 suggestion={journaling}
+                horizonOptions={rangeHorizonOptions}
             />
         </>
     );

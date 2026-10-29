@@ -35,6 +35,7 @@ type TradeForm = {
     grid_count: string;
     trailing_up: boolean;
     trailing_down: boolean;
+    range_horizon_days: string;
     matched_trades: string;
     pnl: string;
     started_at: string;
@@ -62,6 +63,7 @@ function initialValues(
             grid_count: text(trade.grid_count),
             trailing_up: trade.trailing_up,
             trailing_down: trade.trailing_down,
+            range_horizon_days: text(trade.range_horizon_days),
             matched_trades: text(trade.matched_trades),
             pnl: text(trade.pnl),
             started_at: toLocalInput(trade.started_at),
@@ -81,6 +83,7 @@ function initialValues(
         grid_count: text(suggestion?.grid_count),
         trailing_up: suggestion?.trailing_up ?? false,
         trailing_down: suggestion?.trailing_down ?? false,
+        range_horizon_days: text(suggestion?.metrics.range_horizon_days),
         matched_trades: '0',
         pnl: '',
         started_at: toLocalInput(new Date().toISOString()),
@@ -115,10 +118,12 @@ function Field({
 function TradeFormFields({
     trade,
     suggestion,
+    horizonOptions,
     onDone,
 }: {
     trade: GridTrade | null;
     suggestion: GridSuggestion | null;
+    horizonOptions: number[];
     onDone: () => void;
 }) {
     const form = useForm<TradeForm>(initialValues(trade, suggestion));
@@ -127,6 +132,7 @@ function TradeFormFields({
     form.transform((values) => ({
         ...values,
         suggested_grade: values.suggested_grade || null,
+        range_horizon_days: values.range_horizon_days || null,
         lower_price: values.lower_price || null,
         upper_price: values.upper_price || null,
         grid_count: values.grid_count || null,
@@ -319,6 +325,35 @@ function TradeFormFields({
                 </div>
             </div>
 
+            <Field
+                label="Range horizon"
+                htmlFor="range_horizon_days"
+                error={errors.range_horizon_days}
+                hint="The horizon the bot's range was sized for, so you can compare horizons"
+            >
+                <Select
+                    value={data.range_horizon_days || 'none'}
+                    onValueChange={(value) =>
+                        setData(
+                            'range_horizon_days',
+                            value === 'none' ? '' : value,
+                        )
+                    }
+                >
+                    <SelectTrigger id="range_horizon_days">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="none">Not set</SelectItem>
+                        {horizonOptions.map((days) => (
+                            <SelectItem key={days} value={String(days)}>
+                                {days} days
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </Field>
+
             <div className="grid gap-4 sm:grid-cols-2">
                 <Field
                     label="Matched trades"
@@ -414,11 +449,13 @@ export default function GridTradeDialog({
     onOpenChange,
     trade = null,
     suggestion = null,
+    horizonOptions,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     trade?: GridTrade | null;
     suggestion?: GridSuggestion | null;
+    horizonOptions: number[];
 }) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -438,6 +475,7 @@ export default function GridTradeDialog({
                         key={trade?.id ?? suggestion?.id ?? 'new'}
                         trade={trade}
                         suggestion={suggestion}
+                        horizonOptions={horizonOptions}
                         onDone={() => onOpenChange(false)}
                     />
                 )}

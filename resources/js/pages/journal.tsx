@@ -24,7 +24,12 @@ import {
 } from '@/lib/grid-format';
 import { cn } from '@/lib/utils';
 import { index as journalIndex } from '@/routes/grid-trades';
-import type { GridTrade, JournalExposure, JournalSummary } from '@/types';
+import type {
+    GridTrade,
+    JournalExposure,
+    JournalHorizonResult,
+    JournalSummary,
+} from '@/types';
 
 function pnlClass(value: number | null): string {
     if (value === null || value === 0) {
@@ -76,11 +81,15 @@ export default function Journal({
     summary,
     exposure,
     maxPortfolioShockLossPct,
+    byHorizon,
+    rangeHorizonOptions,
 }: {
     trades: GridTrade[];
     summary: JournalSummary;
     exposure: JournalExposure | null;
     maxPortfolioShockLossPct: number;
+    byHorizon: JournalHorizonResult[];
+    rangeHorizonOptions: number[];
 }) {
     const [editorOpen, setEditorOpen] = useState(false);
     const [editing, setEditing] = useState<GridTrade | null>(null);
@@ -162,6 +171,111 @@ export default function Journal({
                         hint="Closed trades"
                     />
                 </div>
+
+                {byHorizon.length > 0 && (
+                    <Card className="gap-3 py-4">
+                        <CardContent className="space-y-3 px-4">
+                            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                                <h2 className="text-sm font-semibold">
+                                    By range horizon
+                                </h2>
+                                <p className="text-xs text-muted-foreground">
+                                    PnL, win rate and ROI count finished trades
+                                    with a PnL; matched trades per day count
+                                    every trade
+                                </p>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="text-left text-xs text-muted-foreground">
+                                        <tr className="[&>th]:py-1.5 [&>th]:pr-4 [&>th]:font-medium [&>th]:whitespace-nowrap">
+                                            <th>Horizon</th>
+                                            <th className="text-right">
+                                                Trades
+                                            </th>
+                                            <th className="text-right">
+                                                Total PnL
+                                            </th>
+                                            <th className="text-right">
+                                                Win rate
+                                            </th>
+                                            <th className="text-right">
+                                                Avg ROI
+                                            </th>
+                                            <th className="text-right">
+                                                Matched / day
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border/60">
+                                        {byHorizon.map((row) => (
+                                            <tr
+                                                key={
+                                                    row.range_horizon_days ??
+                                                    'none'
+                                                }
+                                                className="[&>td]:py-1.5 [&>td]:pr-4 [&>td]:whitespace-nowrap"
+                                            >
+                                                <td className="font-medium">
+                                                    {row.range_horizon_days ===
+                                                    null
+                                                        ? 'Not set'
+                                                        : `${row.range_horizon_days} days`}
+                                                </td>
+                                                <td className="text-right tabular-nums">
+                                                    {row.trades}
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {' '}
+                                                        ({
+                                                            row.closed_with_pnl
+                                                        }{' '}
+                                                        closed)
+                                                    </span>
+                                                </td>
+                                                <td
+                                                    className={cn(
+                                                        'text-right tabular-nums',
+                                                        pnlClass(row.total_pnl),
+                                                    )}
+                                                >
+                                                    {signedUsdt(row.total_pnl)}
+                                                </td>
+                                                <td className="text-right tabular-nums">
+                                                    {row.win_rate_pct === null
+                                                        ? '–'
+                                                        : formatPct(
+                                                              row.win_rate_pct,
+                                                              1,
+                                                          )}
+                                                </td>
+                                                <td
+                                                    className={cn(
+                                                        'text-right tabular-nums',
+                                                        pnlClass(
+                                                            row.average_roi_pct,
+                                                        ),
+                                                    )}
+                                                >
+                                                    {row.average_roi_pct ===
+                                                    null
+                                                        ? '–'
+                                                        : formatPct(
+                                                              row.average_roi_pct,
+                                                              2,
+                                                              true,
+                                                          )}
+                                                </td>
+                                                <td className="text-right tabular-nums">
+                                                    {row.matched_per_day ?? '–'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {exposure && (
                     <Card
@@ -303,9 +417,14 @@ export default function Journal({
                                     <td>
                                         <ModeBadge mode={trade.mode} />
                                         {(trade.trailing_up ||
-                                            trade.trailing_down) && (
+                                            trade.trailing_down ||
+                                            trade.range_horizon_days !==
+                                                null) && (
                                             <div className="mt-1 text-xs text-muted-foreground">
                                                 {[
+                                                    trade.range_horizon_days !==
+                                                        null &&
+                                                        `${trade.range_horizon_days}-day range`,
                                                     trade.trailing_up &&
                                                         'Trailing up',
                                                     trade.trailing_down &&
@@ -408,6 +527,7 @@ export default function Journal({
                 open={editorOpen}
                 onOpenChange={setEditorOpen}
                 trade={editing}
+                horizonOptions={rangeHorizonOptions}
             />
 
             <Dialog

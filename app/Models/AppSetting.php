@@ -21,6 +21,8 @@ class AppSetting extends Model
 
     public const string AllowTrailing = 'grid.allow_trailing';
 
+    public const string RangeHorizonDays = 'grid.range_horizon_days';
+
     protected $primaryKey = 'key';
 
     protected $keyType = 'string';
@@ -40,6 +42,21 @@ class AppSetting extends Model
     public static function setSpacingMultiplier(float $multiplier): void
     {
         static::query()->updateOrCreate(['key' => self::SpacingMultiplier], ['value' => (string) $multiplier]);
+    }
+
+    /**
+     * Planned bot runtime in days that ranges are sized for, falling back to the configured default.
+     */
+    public static function rangeHorizonDays(): int
+    {
+        $value = static::query()->whereKey(self::RangeHorizonDays)->value('value');
+
+        return $value === null ? (int) config('grid.range_horizon_days') : (int) $value;
+    }
+
+    public static function setRangeHorizonDays(int $days): void
+    {
+        static::query()->updateOrCreate(['key' => self::RangeHorizonDays], ['value' => (string) $days]);
     }
 
     /**

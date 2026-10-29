@@ -184,6 +184,18 @@ it('never spaces grids tighter than fees plus the minimum net profit', function 
     expect($suggestion['profit_per_grid_pct'])->toBeGreaterThanOrEqual(config('grid.min_net_grid_profit') * 100 - 0.01);
 });
 
+it('sizes a narrower range for a shorter range horizon', function () {
+    $analyzer = new GridAnalyzer;
+    $candles = candlesFrom(fn (int $hour): float => 100 + 4 * sin(2 * M_PI * $hour / 24) + 0.6 * sin($hour * 1.7) + 6 * sin(2 * M_PI * $hour / 240));
+
+    $week = $analyzer->analyze('RANGEUSDT', $candles, marketAt(end($candles)['close']), rangeHorizonDays: 7);
+    $threeDays = $analyzer->analyze('RANGEUSDT', $candles, marketAt(end($candles)['close']), rangeHorizonDays: 3);
+
+    expect($threeDays['upper_price'] / $threeDays['lower_price'])->toBeLessThan($week['upper_price'] / $week['lower_price'])
+        ->and($threeDays['metrics']['range_horizon_days'])->toBe(3)
+        ->and($week['metrics']['range_horizon_days'])->toBe(7);
+});
+
 it('caps leverage for very volatile symbols', function () {
     $candles = candlesFrom(fn (int $hour): float => 100 + 30 * sin(2 * M_PI * $hour / 24));
 

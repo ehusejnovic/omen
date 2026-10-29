@@ -23,6 +23,8 @@ class GridSettingsController extends Controller
             'spacingMultiplier' => AppSetting::spacingMultiplier(),
             'defaultSpacingMultiplier' => (float) config('grid.spacing_multiplier'),
             'allowTrailing' => AppSetting::allowsTrailing(),
+            'rangeHorizonDays' => AppSetting::rangeHorizonDays(),
+            'rangeHorizonOptions' => config('grid.range_horizons'),
         ]);
     }
 
@@ -35,12 +37,15 @@ class GridSettingsController extends Controller
 
         $spacingMultiplier = round((float) $request->validated('spacing_multiplier'), 2);
         $allowTrailing = $request->boolean('allow_trailing');
+        $rangeHorizonDays = $request->integer('range_horizon_days');
         $scanSettingsChanged = $spacingMultiplier !== AppSetting::spacingMultiplier()
-            || $allowTrailing !== AppSetting::allowsTrailing();
+            || $allowTrailing !== AppSetting::allowsTrailing()
+            || $rangeHorizonDays !== AppSetting::rangeHorizonDays();
 
         if ($scanSettingsChanged) {
             AppSetting::setSpacingMultiplier($spacingMultiplier);
             AppSetting::setAllowsTrailing($allowTrailing);
+            AppSetting::setRangeHorizonDays($rangeHorizonDays);
             RunGridScan::dispatch();
         }
 

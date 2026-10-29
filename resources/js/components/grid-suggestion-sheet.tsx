@@ -1,4 +1,4 @@
-import { NotebookPen, TriangleAlert } from 'lucide-react';
+import { ExternalLink, NotebookPen, TriangleAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { GradeBadge, ModeBadge } from '@/components/grid-badges';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -45,6 +45,10 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
             <dl className="divide-y divide-border/60">{children}</dl>
         </section>
     );
+}
+
+export function binanceGridUrl(symbol: string): string {
+    return `https://www.binance.com/en/trading-bots/futures/grid/${encodeURIComponent(symbol)}`;
 }
 
 export function entryTriggerLabel(
@@ -98,14 +102,25 @@ export default function GridSuggestionSheet({
                         </SheetHeader>
 
                         <div className="space-y-6 px-4 pb-6">
-                            <Button
-                                variant="outline"
-                                className="w-full"
-                                onClick={() => onJournal(suggestion)}
-                            >
-                                <NotebookPen className="size-4" />
-                                Journal this trade
-                            </Button>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                                <Button asChild>
+                                    <a
+                                        href={binanceGridUrl(suggestion.symbol)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        <ExternalLink className="size-4" />
+                                        Open on Binance
+                                    </a>
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => onJournal(suggestion)}
+                                >
+                                    <NotebookPen className="size-4" />
+                                    Journal this trade
+                                </Button>
+                            </div>
 
                             {suggestion.below_min_notional && (
                                 <Alert variant="destructive">
@@ -131,6 +146,8 @@ export default function GridSuggestionSheet({
                                 </Row>
                                 <Row label="Range width">
                                     {formatPct(suggestion.range_width_pct)}
+                                    {suggestion.metrics.range_horizon_days &&
+                                        ` · sized for ${suggestion.metrics.range_horizon_days} days`}
                                 </Row>
                                 <Row label="Number of grids">
                                     {suggestion.grid_count} (

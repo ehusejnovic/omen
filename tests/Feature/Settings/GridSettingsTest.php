@@ -19,7 +19,9 @@ test('grid settings page is displayed with the current spacing multiplier', func
         ->assertInertia(fn (Assert $page) => $page
             ->where('spacingMultiplier', 0.4)
             ->where('defaultSpacingMultiplier', 0.6)
-            ->where('allowTrailing', true));
+            ->where('allowTrailing', true)
+            ->where('rangeHorizonDays', 7)
+            ->where('rangeHorizonOptions', [3, 5, 7]));
 });
 
 test('spacing multiplier falls back to the configured default', function () {
@@ -36,6 +38,7 @@ test('total margin can be updated without rescanning', function () {
             'total_margin' => '2500.50',
             'spacing_multiplier' => '0.6',
             'allow_trailing' => '1',
+            'range_horizon_days' => '7',
         ]);
 
     $response
@@ -56,6 +59,7 @@ test('changing the spacing multiplier saves it and queues a rescan', function ()
             'total_margin' => '1000',
             'spacing_multiplier' => '0.35',
             'allow_trailing' => '1',
+            'range_horizon_days' => '7',
         ]);
 
     $response
@@ -76,6 +80,7 @@ test('turning off trailing suggestions saves it and queues a rescan', function (
             'total_margin' => '1000',
             'spacing_multiplier' => '0.6',
             'allow_trailing' => '0',
+            'range_horizon_days' => '7',
         ]);
 
     $response->assertSessionHasNoErrors();
@@ -93,11 +98,50 @@ test('allow trailing must be a boolean', function () {
             'total_margin' => '1000',
             'spacing_multiplier' => '0.6',
             'allow_trailing' => 'maybe',
+            'range_horizon_days' => '7',
         ])
         ->assertSessionHasErrors('allow_trailing');
 
     expect(AppSetting::allowsTrailing())->toBeTrue();
 });
+
+test('changing the range horizon saves it and queues a rescan', function () {
+    Queue::fake([RunGridScan::class]);
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->patch(route('grid-settings.update'), [
+            'total_margin' => '1000',
+            'spacing_multiplier' => '0.6',
+            'allow_trailing' => '1',
+            'range_horizon_days' => '3',
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect(AppSetting::rangeHorizonDays())->toBe(3);
+    Queue::assertPushed(RunGridScan::class);
+});
+
+test('range horizon must be one of the offered choices', function (mixed $days) {
+    Queue::fake([RunGridScan::class]);
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->patch(route('grid-settings.update'), [
+            'total_margin' => '1000',
+            'spacing_multiplier' => '0.6',
+            'allow_trailing' => '1',
+            'range_horizon_days' => $days,
+        ])
+        ->assertSessionHasErrors('range_horizon_days');
+
+    expect(AppSetting::rangeHorizonDays())->toBe(7);
+    Queue::assertNotPushed(RunGridScan::class);
+})->with([
+    'missing' => [''],
+    'not offered' => ['4'],
+    'not a number' => ['week'],
+]);
 
 test('total margin must be a valid amount', function (mixed $totalMargin) {
     $user = User::factory()->create(['total_margin' => 1000]);
@@ -109,6 +153,7 @@ test('total margin must be a valid amount', function (mixed $totalMargin) {
             'total_margin' => $totalMargin,
             'spacing_multiplier' => '0.6',
             'allow_trailing' => '1',
+            'range_horizon_days' => '7',
         ]);
 
     $response
@@ -134,6 +179,7 @@ test('spacing multiplier must be within range', function (mixed $spacingMultipli
             'total_margin' => '1000',
             'spacing_multiplier' => $spacingMultiplier,
             'allow_trailing' => '1',
+            'range_horizon_days' => '7',
         ]);
 
     $response->assertSessionHasErrors('spacing_multiplier');
