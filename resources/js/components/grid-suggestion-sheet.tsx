@@ -51,6 +51,18 @@ export function binanceGridUrl(symbol: string): string {
     return `https://www.binance.com/en/trading-bots/futures/grid/${encodeURIComponent(symbol)}`;
 }
 
+const dailyTrendLabels: Record<string, string> = {
+    bearish: 'Downtrend',
+    bullish: 'Uptrend',
+    neutral: 'No clear trend',
+};
+
+export function dailyTrendLabel(suggestion: GridSuggestion): string | null {
+    const trend = suggestion.metrics.daily_trend;
+
+    return trend ? dailyTrendLabels[trend] : null;
+}
+
 export function entryTriggerLabel(
     suggestion: GridSuggestion,
     tickSize: number,
@@ -251,6 +263,14 @@ export default function GridSuggestionSheet({
                                         )}
                                     </Row>
                                 )}
+                                {(suggestion.metrics.score_breakdown
+                                    .daily_trend ?? 0) < 0 && (
+                                    <Row label="Penalty (daily trend tilt)">
+                                        {suggestion.metrics.score_breakdown.daily_trend.toFixed(
+                                            1,
+                                        )}
+                                    </Row>
+                                )}
                             </Section>
 
                             {suggestion.metrics.btc_beta != null && (
@@ -324,6 +344,46 @@ export default function GridSuggestionSheet({
                                     )}
                                 </Section>
                             )}
+
+                            <Section title="Daily trend">
+                                <Row label="Trend">
+                                    {dailyTrendLabel(suggestion) ??
+                                        'Not enough daily history'}
+                                </Row>
+                                {suggestion.metrics.daily_ema20_slope_pct !=
+                                    null && (
+                                    <Row label="20-day EMA, last 5 days">
+                                        {formatPct(
+                                            suggestion.metrics
+                                                .daily_ema20_slope_pct,
+                                            2,
+                                            true,
+                                        )}
+                                    </Row>
+                                )}
+                                {suggestion.metrics.daily_close_vs_ema20_pct !=
+                                    null && (
+                                    <Row label="Price vs 20-day EMA">
+                                        {formatPct(
+                                            suggestion.metrics
+                                                .daily_close_vs_ema20_pct,
+                                            2,
+                                            true,
+                                        )}
+                                    </Row>
+                                )}
+                                {suggestion.metrics.daily_return_30d_pct !=
+                                    null && (
+                                    <Row label="30-day move">
+                                        {formatPct(
+                                            suggestion.metrics
+                                                .daily_return_30d_pct,
+                                            2,
+                                            true,
+                                        )}
+                                    </Row>
+                                )}
+                            </Section>
 
                             <Section title="Market metrics">
                                 <Row label="Daily volatility">

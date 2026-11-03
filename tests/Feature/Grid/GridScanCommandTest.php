@@ -231,3 +231,16 @@ it('stores BTC sensitivity for scanned symbols, fetching BTC even when it is out
 
     Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'symbol=BTCUSDT'));
 });
+
+it('judges every symbol against its daily trend from daily candles', function () {
+    Http::preventStrayRequests();
+    fakeBinanceMarket();
+
+    $this->artisan('grid:scan')->assertSuccessful();
+
+    expect(GridScan::query()->sole()->suggestions()->sole()->metrics['daily_trend'])->toBe('neutral');
+
+    Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'symbol=BTCUSDT')
+        && str_contains($request->url(), 'interval=1d')
+        && str_contains($request->url(), 'limit=90'));
+});

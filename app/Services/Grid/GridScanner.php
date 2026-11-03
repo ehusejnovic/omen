@@ -18,6 +18,7 @@ class GridScanner
         private BinanceFuturesClient $binance,
         private GridAnalyzer $analyzer,
         private BtcSensitivity $btcSensitivity,
+        private DailyTrend $dailyTrend,
     ) {}
 
     /**
@@ -68,6 +69,13 @@ class GridScanner
                 config('grid.concurrency'),
             );
 
+            $dailyCandles = $this->binance->closedCandles(
+                $symbols,
+                '1d',
+                config('grid.daily_trend.kline_limit'),
+                config('grid.concurrency'),
+            );
+
             $suggestions = [];
             $symbolStats = [];
             $btcCandles = $candles[BtcSensitivity::Benchmark] ?? [];
@@ -90,7 +98,7 @@ class GridScanner
                     'funding_rate' => $fundingRates[$symbol] ?? 0.0,
                     'tick_size' => $contracts[$symbol]['tick_size'],
                     'min_notional' => $contracts[$symbol]['min_notional'],
-                ], $spacingMultiplier, $allowTrailing, $sensitivity, $rangeHorizonDays);
+                ], $spacingMultiplier, $allowTrailing, $sensitivity, $rangeHorizonDays, $this->dailyTrend->classify($dailyCandles[$symbol] ?? []));
 
                 if ($suggestion !== null) {
                     $suggestions[] = $suggestion;

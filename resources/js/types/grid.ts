@@ -56,6 +56,10 @@ export type GridSuggestion = {
         drift_per_day_pct: number;
         crossings_per_day: number;
         range_horizon_days?: number;
+        daily_trend?: 'bearish' | 'bullish' | 'neutral' | null;
+        daily_ema20_slope_pct?: number | null;
+        daily_close_vs_ema20_pct?: number | null;
+        daily_return_30d_pct?: number | null;
         support: number;
         resistance: number;
         ema20_4h: number;

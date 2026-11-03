@@ -30,9 +30,10 @@ class GridAnalyzer
      * @param  bool  $allowTrailing  Whether trend-following bots may be suggested with trailing up or trailing down.
      * @param  array{beta: float, correlation: float, shock_beta_down: float, shock_beta_up: float, shock_hours_down: int, shock_hours_up: int, btc_daily_volatility_pct: float, btc_shock_pct: float}|null  $btcSensitivity  From {@see BtcSensitivity::measure()}; enables the BTC shock stress test.
      * @param  int|null  $rangeHorizonDays  Planned bot runtime in days; sizes the range, support/resistance lookback, take profit and trailing limit.
+     * @param  array{trend: string, ema_fast: float, ema_slow: float, ema_fast_slope_pct: float, close_vs_ema_fast_pct: float, return_30d_pct: float|null}|null  $dailyTrend  From {@see DailyTrend::classify()}; grids never run against a bearish or bullish daily trend.
      * @return array<string, mixed>|null
      */
-    public function analyze(string $symbol, array $candles, array $market, ?float $spacingMultiplier = null, bool $allowTrailing = true, ?array $btcSensitivity = null, ?int $rangeHorizonDays = null): ?array
+    public function analyze(string $symbol, array $candles, array $market, ?float $spacingMultiplier = null, bool $allowTrailing = true, ?array $btcSensitivity = null, ?int $rangeHorizonDays = null, ?array $dailyTrend = null): ?array
     {
         if (count($candles) < self::MinimumCandles || $market['last_price'] <= 0) {
             return null;
@@ -73,6 +74,24 @@ class GridAnalyzer
         $pathPerDay = array_sum(array_map('abs', $weekReturns)) / 7;
 
         $mode = $this->mode($adx, $efficiency, $trendSignal, $fastTrend, $slowTrend);
+
+        // Never run a grid against the daily trend: follow it when the 4h trend agrees, and skip
+        // the coin while the 4h chart is still bouncing against it.
+        $dailyDirection = $dailyTrend['trend'] ?? DailyTrend::Neutral;
+
+        if ($dailyDirection === DailyTrend::Bearish) {
+            if ($fastTrend >= $slowTrend) {
+                return null;
+            }
+
+            $mode = GridMode::Short;
+        } elseif ($dailyDirection === DailyTrend::Bullish) {
+            if ($fastTrend <= $slowTrend) {
+                return null;
+            }
+
+            $mode = GridMode::Long;
+        }
 
         $zoneHours = $runtimeDays * 24;
         $support = Indicators::percentile(array_slice($lows, -$zoneHours), 5);
@@ -209,6 +228,7 @@ class GridAnalyzer
             'funding' => 10 * $this->clamp(1 - max(0, $this->adverseFunding($mode, $market['funding_rate'])) / 0.0005),
             'risk_reward' => 5 * $this->clamp(($takeProfit / $stopLoss) / 0.75),
             'penalty' => abs($market['price_change_pct']) > 20 ? -10 : 0,
+            'daily_trend' => 0.0 - $this->dailyTiltPenalty($mode, $dailyTrend),
         ];
         $score = (int) round(max(0, min(100, array_sum($breakdown))));
         $grade = GridGrade::fromScore($score);
@@ -266,6 +286,10 @@ class GridAnalyzer
                 'btc_shock_pct' => $btcSensitivity['btc_shock_pct'] ?? null,
                 'btc_shock_move_pct' => $shockMove === null ? null : round($shockMove * 100, 2),
                 'btc_shock_loss_pct' => $shockLossAtOneX === null ? null : round(-$shockLossAtOneX * $leverage * 100, 2),
+                'daily_trend' => $dailyTrend['trend'] ?? null,
+                'daily_ema20_slope_pct' => $dailyTrend['ema_fast_slope_pct'] ?? null,
+                'daily_close_vs_ema20_pct' => $dailyTrend['close_vs_ema_fast_pct'] ?? null,
+                'daily_return_30d_pct' => $dailyTrend['return_30d_pct'] ?? null,
                 'score_breakdown' => array_map(fn (float|int $points): float => round($points, 1), $breakdown),
             ],
             'reasons' => [
@@ -274,6 +298,7 @@ class GridAnalyzer
                     'Strong, healthy trend: trailing %s lets the grid follow a breakout instead of going idle, up to the trailing limit.',
                     $mode === GridMode::Long ? 'up' : 'down',
                 )] : []),
+                ...$this->dailyTrendReasons($mode, $dailyTrend, $breakdown['daily_trend']),
                 ...($leverage < $leverageBeforeShock ? [sprintf(
                     'Leverage lowered from %dx to %dx so a sudden BTC move of %+.1f%% (expected %+.1f%% here) stays clear of liquidation.',
                     $leverageBeforeShock,
@@ -283,6 +308,62 @@ class GridAnalyzer
                 )] : []),
             ],
         ];
+    }
+
+    /**
+     * Points lost when the daily 20-day EMA slopes against the grid without forming a full daily trend.
+     * Normal bots lose out to a tilt either way; Long and Short bots only to a tilt against them.
+     *
+     * @param  array{ema_fast_slope_pct: float}|null  $dailyTrend
+     */
+    private function dailyTiltPenalty(GridMode $mode, ?array $dailyTrend): float
+    {
+        if ($dailyTrend === null) {
+            return 0.0;
+        }
+
+        $slope = $dailyTrend['ema_fast_slope_pct'];
+        $against = match ($mode) {
+            GridMode::Normal => abs($slope),
+            GridMode::Long => max(0.0, -$slope),
+            GridMode::Short => max(0.0, $slope),
+        };
+        $from = (float) config('grid.daily_trend.penalty_from_slope_pct');
+        $full = (float) config('grid.daily_trend.penalty_full_slope_pct');
+
+        return (float) config('grid.daily_trend.penalty_points') * $this->clamp(($against - $from) / ($full - $from));
+    }
+
+    /**
+     * Explain how the daily trend shaped the suggestion.
+     *
+     * @param  array{trend: string, ema_fast_slope_pct: float}|null  $dailyTrend
+     * @return list<string>
+     */
+    private function dailyTrendReasons(GridMode $mode, ?array $dailyTrend, float $penalty): array
+    {
+        if ($dailyTrend === null) {
+            return ['Not enough daily history to judge the daily trend.'];
+        }
+
+        $reasons = match ($dailyTrend['trend']) {
+            DailyTrend::Bearish => ['Daily downtrend (price below a falling 20-day EMA, which is below the 50-day EMA) and the 4h trend agrees, so this is a Short bot rather than a Normal one.'],
+            DailyTrend::Bullish => ['Daily uptrend (price above a rising 20-day EMA, which is above the 50-day EMA) and the 4h trend agrees, so this is a Long bot rather than a Normal one.'],
+            default => [],
+        };
+
+        if ($penalty < 0) {
+            $reasons[] = sprintf(
+                'Daily 20-day EMA is tilting %s (%+.1f%% over %d days) against this %s grid: %.0f points.',
+                $dailyTrend['ema_fast_slope_pct'] < 0 ? 'down' : 'up',
+                $dailyTrend['ema_fast_slope_pct'],
+                (int) config('grid.daily_trend.slope_days'),
+                $mode->value,
+                $penalty,
+            );
+        }
+
+        return $reasons;
     }
 
     /**

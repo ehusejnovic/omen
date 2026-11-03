@@ -24,6 +24,26 @@ return [
 
     'concurrency' => 10,
 
+    /*
+    | Daily trend filter. Daily candles classify each coin as bearish (close below a 20-day EMA
+    | that is below the 50-day EMA and has fallen at least `min_trend_slope_pct` over
+    | `slope_days`), bullish (the mirror) or neutral. Grids are never
+    | run against a bearish or bullish daily trend, and a weaker daily tilt against the grid costs
+    | up to `penalty_points`: nothing at `penalty_from_slope_pct` of 20-day EMA change over
+    | `slope_days`, the full penalty at `penalty_full_slope_pct`.
+    */
+    'daily_trend' => [
+        'kline_limit' => 90,
+        'min_candles' => 55,
+        'fast_ema' => 20,
+        'slow_ema' => 50,
+        'slope_days' => 5,
+        'min_trend_slope_pct' => 1.0,
+        'penalty_points' => 15,
+        'penalty_from_slope_pct' => 0.5,
+        'penalty_full_slope_pct' => 3.0,
+    ],
+
     'maker_fee' => 0.0002,
 
     // Default planned bot runtime in days, which sizes the range, the support/resistance lookback,

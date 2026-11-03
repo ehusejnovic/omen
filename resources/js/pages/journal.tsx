@@ -1,10 +1,19 @@
 import { Head, router } from '@inertiajs/react';
-import { Pencil, Plus, Trash2, TriangleAlert } from 'lucide-react';
-import { useState } from 'react';
+import {
+    ArrowDown,
+    ArrowUp,
+    ArrowUpDown,
+    Pencil,
+    Plus,
+    Trash2,
+    TriangleAlert,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import GridTradeController from '@/actions/App/Http/Controllers/GridTradeController';
 import { GradeBadge, ModeBadge } from '@/components/grid-badges';
 import GridTradeDialog from '@/components/grid-trade-dialog';
+import PnlCurve from '@/components/pnl-curve';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -43,6 +52,93 @@ function pnlClass(value: number | null): string {
 
 function signedUsdt(value: number): string {
     return `${value > 0 ? '+' : ''}${formatUsdt(value)}`;
+}
+
+type SortKey =
+    | 'symbol'
+    | 'mode'
+    | 'started_at'
+    | 'duration_seconds'
+    | 'margin'
+    | 'matched_trades'
+    | 'pnl';
+
+type SortDirection = 'asc' | 'desc';
+
+/**
+ * Sort trades by one column. Trades without a PnL always go last, whichever the direction.
+ */
+function sortTrades(
+    trades: GridTrade[],
+    key: SortKey,
+    direction: SortDirection,
+): GridTrade[] {
+    const factor = direction === 'asc' ? 1 : -1;
+
+    return [...trades].sort((a, b) => {
+        const left = a[key];
+        const right = b[key];
+
+        if (left === null || right === null) {
+            return left === right ? 0 : left === null ? 1 : -1;
+        }
+
+        const order =
+            typeof left === 'number' && typeof right === 'number'
+                ? left - right
+                : String(left).localeCompare(String(right));
+
+        return order === 0 ? b.id - a.id : order * factor;
+    });
+}
+
+function SortableHeader({
+    label,
+    column,
+    sort,
+    onSort,
+    align = 'left',
+}: {
+    label: string;
+    column: SortKey;
+    sort: { key: SortKey; direction: SortDirection };
+    onSort: (column: SortKey) => void;
+    align?: 'left' | 'right';
+}) {
+    const active = sort.key === column;
+    const Icon = !active
+        ? ArrowUpDown
+        : sort.direction === 'asc'
+          ? ArrowUp
+          : ArrowDown;
+
+    return (
+        <th
+            aria-sort={
+                active
+                    ? sort.direction === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                    : 'none'
+            }
+            className={cn(align === 'right' && 'text-right')}
+        >
+            <button
+                type="button"
+                onClick={() => onSort(column)}
+                className={cn(
+                    'inline-flex items-center gap-1 hover:text-foreground',
+                    active && 'text-foreground',
+                )}
+            >
+                {label}
+                <Icon
+                    className={cn('size-3', !active && 'opacity-40')}
+                    aria-hidden
+                />
+            </button>
+        </th>
+    );
 }
 
 function StatCard({
@@ -95,6 +191,31 @@ export default function Journal({
     const [editing, setEditing] = useState<GridTrade | null>(null);
     const [deleting, setDeleting] = useState<GridTrade | null>(null);
     const [processingDelete, setProcessingDelete] = useState(false);
+    const [sort, setSort] = useState<{
+        key: SortKey;
+        direction: SortDirection;
+    }>({ key: 'started_at', direction: 'desc' });
+    const sortedTrades = useMemo(
+        () => sortTrades(trades, sort.key, sort.direction),
+        [trades, sort],
+    );
+
+    function toggleSort(column: SortKey) {
+        setSort((current) =>
+            current.key === column
+                ? {
+                      key: column,
+                      direction: current.direction === 'asc' ? 'desc' : 'asc',
+                  }
+                : {
+                      key: column,
+                      direction:
+                          column === 'symbol' || column === 'mode'
+                              ? 'asc'
+                              : 'desc',
+                  },
+        );
+    }
 
     function openEditor(trade: GridTrade | null) {
         setEditing(trade);
@@ -171,6 +292,12 @@ export default function Journal({
                         hint="Closed trades"
                     />
                 </div>
+
+                <Card className="gap-3 py-4">
+                    <CardContent className="px-4">
+                        <PnlCurve trades={trades} />
+                    </CardContent>
+                </Card>
 
                 {byHorizon.length > 0 && (
                     <Card className="gap-3 py-4">
@@ -375,19 +502,58 @@ export default function Journal({
                     <table className="w-full text-sm">
                         <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
                             <tr className="[&>th]:px-3 [&>th]:py-2.5 [&>th]:font-medium [&>th]:whitespace-nowrap">
-                                <th>Symbol</th>
-                                <th>Bot</th>
-                                <th>Started</th>
-                                <th className="text-right">Duration</th>
-                                <th className="text-right">Margin</th>
-                                <th className="text-right">Matched</th>
-                                <th className="text-right">PnL</th>
+                                <SortableHeader
+                                    label="Symbol"
+                                    column="symbol"
+                                    sort={sort}
+                                    onSort={toggleSort}
+                                />
+                                <SortableHeader
+                                    label="Bot"
+                                    column="mode"
+                                    sort={sort}
+                                    onSort={toggleSort}
+                                />
+                                <SortableHeader
+                                    label="Started"
+                                    column="started_at"
+                                    sort={sort}
+                                    onSort={toggleSort}
+                                />
+                                <SortableHeader
+                                    label="Duration"
+                                    column="duration_seconds"
+                                    sort={sort}
+                                    onSort={toggleSort}
+                                    align="right"
+                                />
+                                <SortableHeader
+                                    label="Margin"
+                                    column="margin"
+                                    sort={sort}
+                                    onSort={toggleSort}
+                                    align="right"
+                                />
+                                <SortableHeader
+                                    label="Matched"
+                                    column="matched_trades"
+                                    sort={sort}
+                                    onSort={toggleSort}
+                                    align="right"
+                                />
+                                <SortableHeader
+                                    label="PnL"
+                                    column="pnl"
+                                    sort={sort}
+                                    onSort={toggleSort}
+                                    align="right"
+                                />
                                 <th>Notes</th>
                                 <th className="sr-only">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border/60">
-                            {trades.map((trade) => (
+                            {sortedTrades.map((trade) => (
                                 <tr
                                     key={trade.id}
                                     className="[&>td]:px-3 [&>td]:py-2.5 [&>td]:whitespace-nowrap"

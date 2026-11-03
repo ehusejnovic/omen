@@ -6,6 +6,7 @@ import GridScannerController from '@/actions/App/Http/Controllers/GridScannerCon
 import { GradeBadge, ModeBadge } from '@/components/grid-badges';
 import GridTradeDialog from '@/components/grid-trade-dialog';
 import GridSuggestionSheet, {
+    dailyTrendLabel,
     entryTriggerLabel,
 } from '@/components/grid-suggestion-sheet';
 import { Button } from '@/components/ui/button';
@@ -303,9 +304,17 @@ export default function Dashboard({
                                         </td>
                                         <td>
                                             <ModeBadge mode={suggestion.mode} />
+                                            {dailyTrendLabel(suggestion) && (
+                                                <div className="mt-1 text-xs text-muted-foreground">
+                                                    Daily:{' '}
+                                                    {dailyTrendLabel(
+                                                        suggestion,
+                                                    )?.toLowerCase()}
+                                                </div>
+                                            )}
                                             {(suggestion.trailing_up ||
                                                 suggestion.trailing_down) && (
-                                                <div className="mt-1 text-xs text-muted-foreground">
+                                                <div className="text-xs text-muted-foreground">
                                                     {suggestion.trailing_up
                                                         ? 'Trailing up'
                                                         : 'Trailing down'}

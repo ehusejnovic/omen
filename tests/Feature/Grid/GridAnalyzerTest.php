@@ -253,6 +253,83 @@ it('skips the BTC shock stress test without BTC sensitivity', function () {
         ->and($suggestion['metrics']['btc_shock_loss_pct'])->toBeNull();
 });
 
+/**
+ * Hourly candles that read as range-bound over 7 days, with the 4h trend gently up or down.
+ */
+function rangingCandlesWith4hTrend(string $direction): array
+{
+    $drift = $direction === 'up' ? 0.012 : -0.004;
+
+    return candlesFrom(fn (int $hour): float => 100 + 4 * sin(2 * M_PI * $hour / 24) + 0.6 * sin($hour * 1.7) + $drift * $hour);
+}
+
+/**
+ * @return array{trend: string, ema_fast: float, ema_slow: float, ema_fast_slope_pct: float, close_vs_ema_fast_pct: float, return_30d_pct: float|null}
+ */
+function dailyTrendOf(string $trend, float $slopePct): array
+{
+    return [
+        'trend' => $trend,
+        'ema_fast' => 100,
+        'ema_slow' => 100,
+        'ema_fast_slope_pct' => $slopePct,
+        'close_vs_ema_fast_pct' => $slopePct,
+        'return_30d_pct' => $slopePct * 3,
+    ];
+}
+
+it('follows the daily trend when the 4h trend agrees instead of suggesting a normal grid', function (string $daily, string $fourHour, GridMode $mode) {
+    $candles = rangingCandlesWith4hTrend($fourHour);
+    $market = marketAt(end($candles)['close']);
+    $analyzer = new GridAnalyzer;
+
+    $withoutDailyTrend = $analyzer->analyze('TRENDUSDT', $candles, $market);
+    $suggestion = $analyzer->analyze('TRENDUSDT', $candles, $market, dailyTrend: dailyTrendOf($daily, $daily === 'bearish' ? -2 : 2));
+
+    expect($withoutDailyTrend['mode'])->toBe(GridMode::Normal)
+        ->and($suggestion['mode'])->toBe($mode)
+        ->and($suggestion['metrics']['daily_trend'])->toBe($daily)
+        ->and($suggestion['metrics']['score_breakdown']['daily_trend'])->toBe(0.0)
+        ->and(collect($suggestion['reasons'])->contains(fn (string $reason): bool => str_starts_with($reason, 'Daily '.($daily === 'bearish' ? 'downtrend' : 'uptrend'))))->toBeTrue();
+})->with([
+    'daily and 4h down' => ['bearish', 'down', GridMode::Short],
+    'daily and 4h up' => ['bullish', 'up', GridMode::Long],
+]);
+
+it('skips a coin while the 4h chart bounces against its daily trend', function (string $daily, string $fourHour) {
+    $candles = rangingCandlesWith4hTrend($fourHour);
+
+    expect((new GridAnalyzer)->analyze('TRENDUSDT', $candles, marketAt(end($candles)['close']), dailyTrend: dailyTrendOf($daily, $daily === 'bearish' ? -2 : 2)))->toBeNull();
+})->with([
+    'daily down, 4h bouncing up' => ['bearish', 'up'],
+    'daily up, 4h pulling back' => ['bullish', 'down'],
+]);
+
+it('takes points off a normal grid when the daily trend tilts without fully forming', function (float $slope, float $penalty) {
+    $analyzer = new GridAnalyzer;
+    $plain = $analyzer->analyze('RANGEUSDT', rangingCandles(), marketAt(100), dailyTrend: dailyTrendOf('neutral', 0));
+    $tilted = $analyzer->analyze('RANGEUSDT', rangingCandles(), marketAt(100), dailyTrend: dailyTrendOf('neutral', $slope));
+
+    expect($tilted['mode'])->toBe(GridMode::Normal)
+        ->and($tilted['metrics']['score_breakdown']['daily_trend'])->toBe($penalty)
+        ->and($plain['metrics']['score_breakdown']['daily_trend'])->toBe(0.0)
+        ->and($plain['score'] - $tilted['score'])->toBeBetween((int) floor(-$penalty), (int) ceil(-$penalty));
+})->with([
+    'slight tilt is free' => [-0.4, 0.0],
+    'half way, down' => [-1.75, -7.5],
+    'half way, up' => [1.75, -7.5],
+    'strong tilt, full penalty' => [-3.7, -15.0],
+]);
+
+it('does not penalise a short grid for a daily tilt in its own direction', function () {
+    $candles = rangingCandlesWith4hTrend('down');
+
+    $suggestion = (new GridAnalyzer)->analyze('TRENDUSDT', $candles, marketAt(end($candles)['close']), dailyTrend: dailyTrendOf('bearish', -6));
+
+    expect($suggestion['mode'])->toBe(GridMode::Short)
+        ->and($suggestion['metrics']['score_breakdown']['daily_trend'])->toBe(0.0);
+});
+
 it('returns null when there is not enough history', function () {
     $candles = array_slice(rangingCandles(), 0, GridAnalyzer::MinimumCandles - 1);
 
