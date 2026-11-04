@@ -96,6 +96,7 @@ export type GridTrade = {
     trailing_down: boolean;
     range_horizon_days: number | null;
     matched_trades: number;
+    matched_profit: number | null;
     pnl: number | null;
     roi_pct: number | null;
     started_at: string;

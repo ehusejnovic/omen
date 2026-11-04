@@ -40,6 +40,7 @@ class GridTradeRequest extends FormRequest
             'trailing_down' => ['required', 'boolean'],
             'range_horizon_days' => ['nullable', 'integer', Rule::in(config('grid.range_horizons'))],
             'matched_trades' => ['required', 'integer', 'min:0', 'max:1000000'],
+            'matched_profit' => ['nullable', 'numeric', 'between:-100000000,100000000', 'decimal:0,2'],
             'pnl' => ['nullable', 'numeric', 'between:-100000000,100000000', 'decimal:0,2'],
             'started_at' => ['required', 'date', 'before_or_equal:now'],
             'ended_at' => ['nullable', 'date', 'after_or_equal:started_at', 'before_or_equal:now'],

@@ -61,12 +61,13 @@ type SortKey =
     | 'duration_seconds'
     | 'margin'
     | 'matched_trades'
+    | 'matched_profit'
     | 'pnl';
 
 type SortDirection = 'asc' | 'desc';
 
 /**
- * Sort trades by one column. Trades without a PnL always go last, whichever the direction.
+ * Sort trades by one column. Trades with no value in that column always go last, whichever the direction.
  */
 function sortTrades(
     trades: GridTrade[],
@@ -542,6 +543,13 @@ export default function Journal({
                                     align="right"
                                 />
                                 <SortableHeader
+                                    label="Matched profit"
+                                    column="matched_profit"
+                                    sort={sort}
+                                    onSort={toggleSort}
+                                    align="right"
+                                />
+                                <SortableHeader
                                     label="PnL"
                                     column="pnl"
                                     sort={sort}
@@ -632,6 +640,16 @@ export default function Journal({
                                     <td
                                         className={cn(
                                             'text-right tabular-nums',
+                                            pnlClass(trade.matched_profit),
+                                        )}
+                                    >
+                                        {trade.matched_profit === null
+                                            ? '–'
+                                            : signedUsdt(trade.matched_profit)}
+                                    </td>
+                                    <td
+                                        className={cn(
+                                            'text-right tabular-nums',
                                             pnlClass(trade.pnl),
                                         )}
                                     >
@@ -676,7 +694,7 @@ export default function Journal({
                             {trades.length === 0 && (
                                 <tr>
                                     <td
-                                        colSpan={9}
+                                        colSpan={10}
                                         className="px-3 py-12 text-center text-muted-foreground"
                                     >
                                         No trades journaled yet. Add one here or

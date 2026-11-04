@@ -291,6 +291,7 @@ Each entry stores:
 - whether trailing up or trailing down was on
 - the range horizon (3, 5 or 7 days, or not set), filled in from the suggestion
 - **matched trades**: the completed buy/sell pairs, called the arbitrage count on Binance
+- **matched profit** in USDT, the _Matched Profit_ figure from Binance's grid bot history (optional)
 - **PnL** in USDT
 - start and end time, with the **duration** worked out from them (leave the end time empty while the bot is running)
 - notes
@@ -307,7 +308,7 @@ The summary shows:
 - The bottom chart is **daily PnL**. Profit bars are blue and go up; loss bars are red and go down, so the sign never depends on colour alone. Days without a closed trade appear as gaps.
 - Hover, or focus the chart and use the arrow keys, to read a day's PnL, the cumulative total and how many trades closed. **Show table** lists the same numbers per day.
 
-**Trades table.** Click a column header (symbol, bot, started, duration, margin, matched trades or PnL) to sort by it, and click again to reverse. It starts newest first. Trades without a PnL stay at the bottom when sorting by PnL. Sorting happens in the browser and resets on reload. There's no pagination: every trade loads at once, which suits a journal of a few thousand entries.
+**Trades table.** Click a column header (symbol, bot, started, duration, margin, matched trades, matched profit or PnL) to sort by it, and click again to reverse. It starts newest first. Trades with no value stay at the bottom when sorting by matched profit or PnL. Sorting happens in the browser and resets on reload. There's no pagination: every trade loads at once, which suits a journal of a few thousand entries.
 
 **By range horizon.** A table compares horizons side by side: number of trades, total PnL, win rate, average ROI (PnL ÷ margin) and matched trades per day. Total PnL, win rate and ROI count finished trades with a PnL. Matched trades per day counts every trade, running ones up to now. Trades without a horizon are grouped as _Not set_.
 

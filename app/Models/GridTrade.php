@@ -28,6 +28,7 @@ use Illuminate\Support\Carbon;
  * @property bool $trailing_down
  * @property int|null $range_horizon_days
  * @property int $matched_trades
+ * @property float|null $matched_profit
  * @property float|null $pnl
  * @property Carbon $started_at
  * @property Carbon|null $ended_at
@@ -35,7 +36,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['symbol', 'mode', 'suggested_grade', 'margin', 'leverage', 'lower_price', 'upper_price', 'grid_count', 'trailing_up', 'trailing_down', 'range_horizon_days', 'matched_trades', 'pnl', 'started_at', 'ended_at', 'notes'])]
+#[Fillable(['symbol', 'mode', 'suggested_grade', 'margin', 'leverage', 'lower_price', 'upper_price', 'grid_count', 'trailing_up', 'trailing_down', 'range_horizon_days', 'matched_trades', 'matched_profit', 'pnl', 'started_at', 'ended_at', 'notes'])]
 class GridTrade extends Model
 {
     /** @use HasFactory<GridTradeFactory> */
@@ -56,6 +57,7 @@ class GridTrade extends Model
             'upper_price' => 'float',
             'trailing_up' => 'boolean',
             'trailing_down' => 'boolean',
+            'matched_profit' => 'float',
             'pnl' => 'float',
             'started_at' => 'datetime',
             'ended_at' => 'datetime',

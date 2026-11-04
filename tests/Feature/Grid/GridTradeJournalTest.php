@@ -25,6 +25,7 @@ function journalPayload(array $overrides = []): array
         'trailing_down' => false,
         'range_horizon_days' => 5,
         'matched_trades' => 37,
+        'matched_profit' => '8.15',
         'pnl' => '-12.40',
         'started_at' => '2026-10-20T08:00:00.000Z',
         'ended_at' => '2026-10-22T14:30:00.000Z',
@@ -98,6 +99,7 @@ it('journals a trade for the signed-in user', function () {
         ->and($trade->trailing_down)->toBeFalse()
         ->and($trade->range_horizon_days)->toBe(5)
         ->and($trade->matched_trades)->toBe(37)
+        ->and($trade->matched_profit)->toBe(8.15)
         ->and($trade->pnl)->toBe(-12.4)
         ->and($trade->started_at->toIso8601String())->toBe('2026-10-20T08:00:00+00:00')
         ->and($trade->durationInSeconds())->toBe((2 * 24 + 6) * 3600 + 30 * 60);
@@ -124,6 +126,7 @@ it('journals a running trade with only the required fields', function () {
     expect($trade->ended_at)->toBeNull()
         ->and($trade->pnl)->toBeNull()
         ->and($trade->range_horizon_days)->toBeNull()
+        ->and($trade->matched_profit)->toBeNull()
         ->and($trade->lower_price)->toBeNull();
 });
 
@@ -144,6 +147,8 @@ it('rejects invalid trades', function (array $overrides, string $field) {
     'unknown bot mode' => [['mode' => 'hedge'], 'mode'],
     'invalid symbol' => [['symbol' => 'BTC/USDT'], 'symbol'],
     'missing trailing flag' => [['trailing_up' => null], 'trailing_up'],
+    'matched profit not a number' => [['matched_profit' => 'lots'], 'matched_profit'],
+    'matched profit with too many decimals' => [['matched_profit' => '1.234'], 'matched_profit'],
     'range horizon not offered' => [['range_horizon_days' => 4], 'range_horizon_days'],
 ]);
 
@@ -161,6 +166,19 @@ it('updates the user\'s own trade', function () {
     expect($trade->matched_trades)->toBe(52)
         ->and($trade->pnl)->toBe(18.75)
         ->and($trade->ended_at)->not->toBeNull();
+});
+
+it('backfills the matched profit of an existing trade and shows it in the journal', function () {
+    $user = User::factory()->create();
+    $trade = GridTrade::factory()->for($user)->create();
+
+    $this->actingAs($user)
+        ->put(route('grid-trades.update', $trade), journalPayload(['matched_profit' => '21.40']))
+        ->assertSessionHasNoErrors();
+
+    $this->actingAs($user)
+        ->get(route('grid-trades.index'))
+        ->assertInertia(fn (Assert $page) => $page->where('trades.0.matched_profit', 21.4));
 });
 
 it('forbids updating another user\'s trade', function () {

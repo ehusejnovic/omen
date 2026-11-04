@@ -37,6 +37,7 @@ type TradeForm = {
     trailing_down: boolean;
     range_horizon_days: string;
     matched_trades: string;
+    matched_profit: string;
     pnl: string;
     started_at: string;
     ended_at: string;
@@ -65,6 +66,7 @@ function initialValues(
             trailing_down: trade.trailing_down,
             range_horizon_days: text(trade.range_horizon_days),
             matched_trades: text(trade.matched_trades),
+            matched_profit: text(trade.matched_profit),
             pnl: text(trade.pnl),
             started_at: toLocalInput(trade.started_at),
             ended_at: trade.ended_at ? toLocalInput(trade.ended_at) : '',
@@ -85,6 +87,7 @@ function initialValues(
         trailing_down: suggestion?.trailing_down ?? false,
         range_horizon_days: text(suggestion?.metrics.range_horizon_days),
         matched_trades: '0',
+        matched_profit: '',
         pnl: '',
         started_at: toLocalInput(new Date().toISOString()),
         ended_at: '',
@@ -136,6 +139,7 @@ function TradeFormFields({
         lower_price: values.lower_price || null,
         upper_price: values.upper_price || null,
         grid_count: values.grid_count || null,
+        matched_profit: values.matched_profit || null,
         pnl: values.pnl || null,
         started_at: fromLocalInput(values.started_at),
         ended_at: fromLocalInput(values.ended_at),
@@ -354,7 +358,7 @@ function TradeFormFields({
                 </Select>
             </Field>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-3">
                 <Field
                     label="Matched trades"
                     htmlFor="matched_trades"
@@ -370,6 +374,22 @@ function TradeFormFields({
                             setData('matched_trades', event.target.value)
                         }
                         required
+                    />
+                </Field>
+                <Field
+                    label="Matched profit (USDT)"
+                    htmlFor="matched_profit"
+                    error={errors.matched_profit}
+                    hint="Matched Profit from Binance's grid bot history"
+                >
+                    <Input
+                        id="matched_profit"
+                        type="number"
+                        step="0.01"
+                        value={data.matched_profit}
+                        onChange={(event) =>
+                            setData('matched_profit', event.target.value)
+                        }
                     />
                 </Field>
                 <Field
