@@ -39,12 +39,12 @@ A scan runs every hour on the hour, through the scheduler. You can also start on
 
 1. **Universe.** The scan fetches every contract from `/fapi/v1/exchangeInfo` and keeps the ones that are `PERPETUAL`, quoted in USDT and in `TRADING` status. Stablecoin and fiat bases (USDC, FDUSD, EUR and so on) are excluded.
 2. **Ranking by liquidity.** It sorts the remaining contracts by 24h quote volume from `/fapi/v1/ticker/24hr` and takes the top 100.
-3. **Market data.** For each symbol it downloads 499 one-hour candles (about 21 days) from `/fapi/v1/klines`, 10 symbols at a time. It also reads the latest funding rate of every symbol in one call to `/fapi/v1/premiumIndex`. The candle that is still open is discarded. BTCUSDT is always downloaded, even if it isn't in the top 100, because every symbol is compared with it.
-4. **Analysis.** Each symbol goes through the analyser described below. A symbol with fewer than 200 closed candles, such as a new listing, is skipped. So is any setup whose range breakout would lose more than 25% of margin even at 1x (see [Leverage and stop loss](#5-leverage-and-stop-loss)), or where a sudden BTC move would lose more than 60% even at 1x (see [BTC sensitivity](#10-btc-sensitivity-and-the-btc-shock-stress-test)). Every symbol's BTC sensitivity is saved to the `symbol_stats` table, including symbols that end up with no suggestion, so the journal can use it.
+3. **Market data.** For each symbol it downloads 499 one-hour candles (about 21 days) from `/fapi/v1/klines`, 10 symbols at a time, plus 90 daily candles for the daily trend. It also reads the latest funding rate of every symbol in one call to `/fapi/v1/premiumIndex`. The candle that is still open is discarded. BTCUSDT is always downloaded, even if it isn't in the top 100, because every symbol is compared with it.
+4. **Analysis.** Each symbol goes through the analyser described below. A symbol with fewer than 200 closed candles, such as a new listing, is skipped. So is a coin whose 4h chart is bouncing against its daily trend (see [Daily trend filter](#11-daily-trend-filter)), and any setup whose range breakout would lose more than 25% of margin even at 1x (see [Leverage and stop loss](#5-leverage-and-stop-loss)), or where a sudden BTC move would lose more than 60% even at 1x (see [BTC sensitivity](#10-btc-sensitivity-and-the-btc-shock-stress-test)). Every symbol's BTC sensitivity is saved to the `symbol_stats` table, including symbols that end up with no suggestion, so the journal can use it.
 5. **Selection.** The suggestions are sorted by score, with 24h volume breaking ties, and only the top 30 are stored.
 6. **Margin sizing.** Each suggestion stores its margin as a percentage of the total. The scanner page multiplies it by the _Total available margin_ from **Settings → Grid bot** for whoever is viewing, so changing that setting resizes every suggestion at once. The grid spacing multiplier, also in **Settings → Grid bot**, is applied when the scan runs (see [Number of grids and grid type](#4-number-of-grids-and-grid-type)).
 
-A full scan uses about 250 of Binance's 2,400-per-minute request weight and takes about 10 seconds. A lock ensures only one scan runs at a time. Scans older than 7 days are deleted daily.
+A full scan uses about 350 of Binance's 2,400-per-minute request weight and takes about 15 seconds. A lock ensures only one scan runs at a time. Scans older than 7 days are deleted daily.
 
 ---
 
@@ -121,19 +121,19 @@ Centring Normal ranges on the trading zone rather than the current price is deli
 
 ### 5. Leverage and stop loss
 
-Leverage is set by risk. The idea is that **if the price breaks out of the range and hits the stop zone, the bot loses about 25% of its margin** (`max_stop_loss`).
+Leverage is set by risk. The idea is that **if the price breaks out of the range and hits the stop zone, the bot should lose no more than about 25% of its margin** (`max_stop_loss`). Most stop losses land between about 15% and 25%, because leverage is rounded down and capped.
 
 1. The **stop zone** is 1.5 × ATR beyond the range: below the lower limit for Long bots, above the upper limit for Short bots, and on both sides for Normal bots (the worse side counts).
 2. The analyser simulates the bot's position at 1x leverage as the price travels from now to the stop zone:
     - every grid filled on the way adds a position at its grid price;
     - Long and Short bots also hold their starting position.
 
-    It then calculates the unrealised loss. Grid profit already earned is ignored, so the estimate errs on the cautious side.
+    It then calculates the unrealised loss. This is an estimate, not a guaranteed limit. Fees, slippage and funding aren't counted, so a real stop-out can be worse. Grid profit already earned isn't counted either, and Binance's PnL stop includes it, so a profitable bot's stop can trigger later than the stop zone.
 
 3. **Leverage** = ⌊25% ÷ loss at 1x⌋, kept between 1x and 10x. It is capped further for volatile coins: at most **5x** above 6% daily volatility and **3x** above 10%. If the loss at 1x is already above 25%, no leverage can fit the budget, so the symbol is dropped from the results.
 4. **Stop loss (PnL)** = loss at 1x × the chosen leverage, shown as a negative percentage of the bot's margin. Enter it as the bot's PnL stop on Binance.
 
-Directional bots often get 1–2x. Binance's Long and Short grids open a large position at the start, so even a modest move against them loses a lot at 1x.
+Long and Short bots usually get low leverage, often 1–3x. Binance's Long and Short grids open a large position at the start, so even a modest move against them loses a lot at 1x. Very calm coins, such as gold tokens, can still get much more.
 
 ### 6. Expected profit and take profit
 
@@ -385,7 +385,7 @@ Then:
 ```bash
 php artisan migrate --seed   # creates test@example.com / password
 npm install && npm run build
-php artisan grid:scan        # first scan, about 10 seconds
+php artisan grid:scan        # first scan, about 15 seconds
 ```
 
 To keep scans and the **Scan now** button working, run these alongside the web server. With Laravel Herd the site is served at `https://omen.test`.
@@ -527,4 +527,5 @@ If a scan fails, the scanner page keeps showing the last successful scan, the er
 - **BTC market regime filter.** Be more cautious with every Normal grid when BTC itself is trending hard or unusually volatile.
 - **Journal pagination.** Page the trades table once the journal grows into the thousands of entries, keeping the totals, PnL curve and per-horizon table over all trades. Sorting would then move to the server.
 - **Exposure in the stress test across bots.** The journal warns about combined BTC exposure, but suggestions don't yet take your running bots into account when sizing margin.
+
 # omen
