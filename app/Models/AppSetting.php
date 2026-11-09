@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\GridGrade;
+use App\Enums\GridMode;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -22,6 +24,10 @@ class AppSetting extends Model
     public const string AllowTrailing = 'grid.allow_trailing';
 
     public const string RangeHorizonDays = 'grid.range_horizon_days';
+
+    public const string MinimumGrade = 'grid.minimum_grade';
+
+    public const string ModeFilter = 'grid.mode_filter';
 
     protected $primaryKey = 'key';
 
@@ -57,6 +63,32 @@ class AppSetting extends Model
     public static function setRangeHorizonDays(int $days): void
     {
         static::query()->updateOrCreate(['key' => self::RangeHorizonDays], ['value' => (string) $days]);
+    }
+
+    /**
+     * Lowest grade a scan keeps, falling back to the configured default.
+     */
+    public static function minimumGrade(): GridGrade
+    {
+        return GridGrade::from(static::query()->whereKey(self::MinimumGrade)->value('value') ?? config('grid.minimum_grade'));
+    }
+
+    public static function setMinimumGrade(GridGrade $grade): void
+    {
+        static::query()->updateOrCreate(['key' => self::MinimumGrade], ['value' => $grade->value]);
+    }
+
+    /**
+     * Bot type a scan keeps, or null for every type, falling back to the configured default.
+     */
+    public static function modeFilter(): ?GridMode
+    {
+        return GridMode::tryFrom(static::query()->whereKey(self::ModeFilter)->value('value') ?? config('grid.mode_filter'));
+    }
+
+    public static function setModeFilter(?GridMode $mode): void
+    {
+        static::query()->updateOrCreate(['key' => self::ModeFilter], ['value' => $mode->value ?? 'all']);
     }
 
     /**

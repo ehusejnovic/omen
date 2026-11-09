@@ -15,6 +15,9 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { edit } from '@/routes/grid-settings';
+import type { GridGrade, GridMode } from '@/types';
+
+const grades: GridGrade[] = ['A+', 'A', 'B+', 'B', 'C+', 'C'];
 
 export default function GridSettings({
     totalMargin,
@@ -23,6 +26,8 @@ export default function GridSettings({
     allowTrailing,
     rangeHorizonDays,
     rangeHorizonOptions,
+    minimumGrade,
+    modeFilter,
 }: {
     totalMargin: number;
     spacingMultiplier: number;
@@ -30,9 +35,13 @@ export default function GridSettings({
     allowTrailing: boolean;
     rangeHorizonDays: number;
     rangeHorizonOptions: number[];
+    minimumGrade: GridGrade;
+    modeFilter: GridMode | 'all';
 }) {
     const [trailingAllowed, setTrailingAllowed] = useState(allowTrailing);
     const [horizonDays, setHorizonDays] = useState(String(rangeHorizonDays));
+    const [grade, setGrade] = useState<GridGrade>(minimumGrade);
+    const [mode, setMode] = useState<GridMode | 'all'>(modeFilter);
 
     return (
         <>
@@ -171,6 +180,96 @@ export default function GridSettings({
                                     className="mt-2"
                                     message={errors.range_horizon_days}
                                 />
+                            </div>
+
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="minimum_grade">
+                                        Setups to keep
+                                    </Label>
+                                    <input
+                                        type="hidden"
+                                        name="minimum_grade"
+                                        value={grade}
+                                    />
+                                    <Select
+                                        value={grade}
+                                        onValueChange={(value) =>
+                                            setGrade(value as GridGrade)
+                                        }
+                                    >
+                                        <SelectTrigger
+                                            id="minimum_grade"
+                                            className="mt-1 w-full"
+                                        >
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {grades.map((option) => (
+                                                <SelectItem
+                                                    key={option}
+                                                    value={option}
+                                                >
+                                                    {option === 'C'
+                                                        ? 'All grades'
+                                                        : `${option} and better`}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <InputError
+                                        message={errors.minimum_grade}
+                                    />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="mode_filter">
+                                        Bot types
+                                    </Label>
+                                    <input
+                                        type="hidden"
+                                        name="mode_filter"
+                                        value={mode}
+                                    />
+                                    <Select
+                                        value={mode}
+                                        onValueChange={(value) =>
+                                            setMode(value as GridMode | 'all')
+                                        }
+                                    >
+                                        <SelectTrigger
+                                            id="mode_filter"
+                                            className="mt-1 w-full"
+                                        >
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">
+                                                All
+                                            </SelectItem>
+                                            <SelectItem value="normal">
+                                                Normal only
+                                            </SelectItem>
+                                            <SelectItem value="long">
+                                                Long only
+                                            </SelectItem>
+                                            <SelectItem value="short">
+                                                Short only
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <InputError message={errors.mode_filter} />
+                                </div>
+
+                                <p className="text-sm text-muted-foreground sm:col-span-2">
+                                    Each scan keeps the best 30 setups that
+                                    match, so choosing one bot type or a higher
+                                    grade gives you more of what you want
+                                    instead of a mixed list. Fewer than 30 are
+                                    shown when not enough setups match. This
+                                    applies to every user, and changing it
+                                    starts a rescan.
+                                </p>
                             </div>
 
                             <div className="grid gap-2">

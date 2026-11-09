@@ -27,6 +27,16 @@ enum GridGrade: string
     }
 
     /**
+     * Whether this grade is the given grade or better.
+     */
+    public function isAtLeast(self $minimum): bool
+    {
+        $order = array_flip(array_column(self::cases(), 'value'));
+
+        return $order[$this->value] <= $order[$minimum->value];
+    }
+
+    /**
      * Share of the total margin a bot with this grade should receive, in percent.
      */
     public function marginAllocationPct(): float

@@ -52,6 +52,12 @@ return [
 
     'range_horizons' => [3, 5, 7],
 
+    // Default scan result filters: the lowest grade kept, and which bot types ('all', 'normal',
+    // 'long' or 'short'); adjustable in Settings → Grid bot. The best `results` matches are kept.
+    'minimum_grade' => 'C',
+
+    'mode_filter' => 'all',
+
     'max_leverage' => 10,
 
     // Share of the bot's margin the stop loss may lose at a range breakout.

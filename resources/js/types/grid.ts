@@ -10,6 +10,8 @@ export type GridScan = {
     suggestions_count: number;
     spacing_multiplier: number | null;
     range_horizon_days: number | null;
+    minimum_grade: GridGrade | null;
+    mode_filter: GridMode | 'all' | null;
     started_at: string;
     finished_at: string | null;
 };

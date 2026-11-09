@@ -3,7 +3,7 @@ import { RefreshCw, Search, TriangleAlert } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import GridScannerController from '@/actions/App/Http/Controllers/GridScannerController';
-import { GradeBadge, ModeBadge } from '@/components/grid-badges';
+import { GradeBadge, ModeBadge, modeLabels } from '@/components/grid-badges';
 import GridTradeDialog from '@/components/grid-trade-dialog';
 import GridSuggestionSheet, {
     dailyTrendLabel,
@@ -35,6 +35,23 @@ import type { GridGrade, GridMode, GridScan, GridSuggestion } from '@/types';
 const grades: GridGrade[] = ['A+', 'A', 'B+', 'B', 'C+', 'C'];
 
 type ModeFilter = GridMode | 'all';
+
+/**
+ * Describe the scan settings a scan kept results by, e.g. "B and better Short ".
+ */
+function scanFilterLabel(scan: GridScan | null): string {
+    const parts: string[] = [];
+
+    if (scan?.minimum_grade && scan.minimum_grade !== 'C') {
+        parts.push(`${scan.minimum_grade} and better`);
+    }
+
+    if (scan?.mode_filter && scan.mode_filter !== 'all') {
+        parts.push(modeLabels[scan.mode_filter]);
+    }
+
+    return parts.length > 0 ? `${parts.join(' ')} ` : '';
+}
 
 function nextScanLabel(): string {
     const minutes = 60 - new Date().getMinutes();
@@ -133,10 +150,17 @@ export default function Dashboard({
                             Futures grid scanner
                         </h1>
                         <p className="text-sm text-muted-foreground">
-                            Best {scan?.suggestions_count ?? 30} setups by grade
-                            from the top {scan?.symbols_scanned ?? 100} Binance
-                            USDⓈ-M perpetuals by volume, rescanned every hour.
-                            Suggestions only, no orders are placed.
+                            Best {scan?.suggestions_count ?? 30}{' '}
+                            {scanFilterLabel(scan)}setups by grade from the top{' '}
+                            {scan?.symbols_scanned ?? 100} Binance USDⓈ-M
+                            perpetuals by volume, rescanned every hour.
+                            Suggestions only, no orders are placed.{' '}
+                            <Link
+                                href={editGridSettings()}
+                                className="underline underline-offset-4"
+                            >
+                                Change what scans keep
+                            </Link>
                         </p>
                     </div>
                     <Form {...GridScannerController.store.form()}>
@@ -427,7 +451,9 @@ export default function Dashboard({
                                     >
                                         {scan === null
                                             ? 'No scan has finished yet. Run a scan to see suggestions.'
-                                            : 'No suggestions match these filters.'}
+                                            : suggestions.length === 0
+                                              ? 'No setups matched your scan settings this time. Loosen them in Settings → Grid bot, or wait for the next scan.'
+                                              : 'No suggestions match these filters.'}
                                     </td>
                                 </tr>
                             )}

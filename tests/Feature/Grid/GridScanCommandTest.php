@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\GridGrade;
 use App\Enums\GridMode;
 use App\Models\AppSetting;
 use App\Models\GridScan;
@@ -243,4 +244,58 @@ it('judges every symbol against its daily trend from daily candles', function ()
     Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'symbol=BTCUSDT')
         && str_contains($request->url(), 'interval=1d')
         && str_contains($request->url(), 'limit=90'));
+});
+
+function fakeRangeAndUptrendMarket(): void
+{
+    $uptrend = uptrendKlineRows();
+    Http::fake([
+        'fapi.binance.com/fapi/v1/exchangeInfo' => Http::response(['symbols' => [contract('RANGEUSDT', 'RANGE'), contract('UPUSDT', 'UP')]]),
+        'fapi.binance.com/fapi/v1/ticker/24hr' => Http::response([
+            ticker('RANGEUSDT', '900000000'),
+            ['symbol' => 'UPUSDT', 'lastPrice' => $uptrend[count($uptrend) - 2][4], 'quoteVolume' => '900000000', 'priceChangePercent' => '2'],
+        ]),
+        'fapi.binance.com/fapi/v1/premiumIndex' => Http::response([]),
+        'fapi.binance.com/fapi/v1/klines?symbol=UPUSDT*' => Http::response($uptrend),
+        'fapi.binance.com/fapi/v1/klines*' => Http::response(rangingKlineRows()),
+    ]);
+}
+
+it('keeps only the bot types chosen in settings', function (GridMode $mode, string $symbol) {
+    Http::preventStrayRequests();
+    fakeRangeAndUptrendMarket();
+    AppSetting::setModeFilter($mode);
+
+    $this->artisan('grid:scan')->assertSuccessful();
+
+    $scan = GridScan::query()->sole();
+
+    expect($scan->mode_filter)->toBe($mode->value)
+        ->and($scan->symbols_scanned)->toBe(2)
+        ->and($scan->suggestions()->pluck('symbol')->all())->toBe([$symbol]);
+})->with([
+    'normal only' => [GridMode::Normal, 'RANGEUSDT'],
+    'long only' => [GridMode::Long, 'UPUSDT'],
+]);
+
+it('keeps only setups at or above the minimum grade chosen in settings', function () {
+    Http::preventStrayRequests();
+    fakeRangeAndUptrendMarket();
+
+    $this->artisan('grid:scan')->assertSuccessful();
+    $grades = GridScan::query()->sole()->suggestions()->get()->map(fn ($suggestion) => $suggestion->grade);
+    $best = $grades->sortBy(fn (GridGrade $grade): int => array_search($grade, GridGrade::cases(), true))->first();
+    GridScan::query()->delete();
+    AppSetting::setMinimumGrade($best);
+
+    $this->artisan('grid:scan')->assertSuccessful();
+
+    $scan = GridScan::query()->sole();
+    $kept = $scan->suggestions()->get();
+
+    expect($grades)->toHaveCount(2)
+        ->and($scan->minimum_grade)->toBe($best->value)
+        ->and($kept)->not->toBeEmpty()
+        ->and($kept->count())->toBe($grades->filter(fn (GridGrade $grade): bool => $grade === $best)->count())
+        ->and($kept->every(fn ($suggestion): bool => $suggestion->grade->isAtLeast($best)))->toBeTrue();
 });
