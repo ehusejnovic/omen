@@ -39,14 +39,10 @@ class GridScanner
         $spacingMultiplier = AppSetting::spacingMultiplier();
         $allowTrailing = AppSetting::allowsTrailing();
         $rangeHorizonDays = AppSetting::rangeHorizonDays();
-        $minimumGrade = AppSetting::minimumGrade();
-        $modeFilter = AppSetting::modeFilter();
         $scan = GridScan::create([
             'status' => GridScan::StatusRunning,
             'spacing_multiplier' => $spacingMultiplier,
             'range_horizon_days' => $rangeHorizonDays,
-            'minimum_grade' => $minimumGrade->value,
-            'mode_filter' => $modeFilter->value ?? 'all',
             'started_at' => now(),
         ]);
 
@@ -110,8 +106,6 @@ class GridScanner
             }
 
             $suggestions = collect($suggestions)
-                ->filter(fn (array $suggestion): bool => $suggestion['grade']->isAtLeast($minimumGrade)
-                    && ($modeFilter === null || $suggestion['mode'] === $modeFilter))
                 ->sortBy([['score', 'desc'], ['quote_volume_24h', 'desc']])
                 ->take(config('grid.results'))
                 ->values()

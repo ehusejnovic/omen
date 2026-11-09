@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers\Settings;
 
-use App\Enums\GridGrade;
-use App\Enums\GridMode;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\GridSettingsUpdateRequest;
 use App\Jobs\RunGridScan;
@@ -27,8 +25,6 @@ class GridSettingsController extends Controller
             'allowTrailing' => AppSetting::allowsTrailing(),
             'rangeHorizonDays' => AppSetting::rangeHorizonDays(),
             'rangeHorizonOptions' => config('grid.range_horizons'),
-            'minimumGrade' => AppSetting::minimumGrade(),
-            'modeFilter' => AppSetting::modeFilter()->value ?? 'all',
         ]);
     }
 
@@ -42,20 +38,14 @@ class GridSettingsController extends Controller
         $spacingMultiplier = round((float) $request->validated('spacing_multiplier'), 2);
         $allowTrailing = $request->boolean('allow_trailing');
         $rangeHorizonDays = $request->integer('range_horizon_days');
-        $minimumGrade = $request->enum('minimum_grade', GridGrade::class);
-        $modeFilter = GridMode::tryFrom($request->string('mode_filter')->value());
         $scanSettingsChanged = $spacingMultiplier !== AppSetting::spacingMultiplier()
             || $allowTrailing !== AppSetting::allowsTrailing()
-            || $rangeHorizonDays !== AppSetting::rangeHorizonDays()
-            || $minimumGrade !== AppSetting::minimumGrade()
-            || $modeFilter !== AppSetting::modeFilter();
+            || $rangeHorizonDays !== AppSetting::rangeHorizonDays();
 
         if ($scanSettingsChanged) {
             AppSetting::setSpacingMultiplier($spacingMultiplier);
             AppSetting::setAllowsTrailing($allowTrailing);
             AppSetting::setRangeHorizonDays($rangeHorizonDays);
-            AppSetting::setMinimumGrade($minimumGrade);
-            AppSetting::setModeFilter($modeFilter);
             RunGridScan::dispatch();
         }
 

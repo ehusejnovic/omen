@@ -1,7 +1,5 @@
 <?php
 
-use App\Enums\GridGrade;
-use App\Enums\GridMode;
 use App\Jobs\RunGridScan;
 use App\Models\AppSetting;
 use App\Models\User;
@@ -23,9 +21,7 @@ test('grid settings page is displayed with the current spacing multiplier', func
             ->where('defaultSpacingMultiplier', 0.6)
             ->where('allowTrailing', true)
             ->where('rangeHorizonDays', 7)
-            ->where('rangeHorizonOptions', [3, 5, 7])
-            ->where('minimumGrade', 'C')
-            ->where('modeFilter', 'all'));
+            ->where('rangeHorizonOptions', [3, 5, 7]));
 });
 
 test('spacing multiplier falls back to the configured default', function () {
@@ -43,8 +39,6 @@ test('total margin can be updated without rescanning', function () {
             'spacing_multiplier' => '0.6',
             'allow_trailing' => '1',
             'range_horizon_days' => '7',
-            'minimum_grade' => 'C',
-            'mode_filter' => 'all',
         ]);
 
     $response
@@ -66,8 +60,6 @@ test('changing the spacing multiplier saves it and queues a rescan', function ()
             'spacing_multiplier' => '0.35',
             'allow_trailing' => '1',
             'range_horizon_days' => '7',
-            'minimum_grade' => 'C',
-            'mode_filter' => 'all',
         ]);
 
     $response
@@ -89,8 +81,6 @@ test('turning off trailing suggestions saves it and queues a rescan', function (
             'spacing_multiplier' => '0.6',
             'allow_trailing' => '0',
             'range_horizon_days' => '7',
-            'minimum_grade' => 'C',
-            'mode_filter' => 'all',
         ]);
 
     $response->assertSessionHasNoErrors();
@@ -109,8 +99,6 @@ test('allow trailing must be a boolean', function () {
             'spacing_multiplier' => '0.6',
             'allow_trailing' => 'maybe',
             'range_horizon_days' => '7',
-            'minimum_grade' => 'C',
-            'mode_filter' => 'all',
         ])
         ->assertSessionHasErrors('allow_trailing');
 
@@ -127,8 +115,6 @@ test('changing the range horizon saves it and queues a rescan', function () {
             'spacing_multiplier' => '0.6',
             'allow_trailing' => '1',
             'range_horizon_days' => '3',
-            'minimum_grade' => 'C',
-            'mode_filter' => 'all',
         ])
         ->assertSessionHasNoErrors();
 
@@ -146,8 +132,6 @@ test('range horizon must be one of the offered choices', function (mixed $days) 
             'spacing_multiplier' => '0.6',
             'allow_trailing' => '1',
             'range_horizon_days' => $days,
-            'minimum_grade' => 'C',
-            'mode_filter' => 'all',
         ])
         ->assertSessionHasErrors('range_horizon_days');
 
@@ -157,68 +141,6 @@ test('range horizon must be one of the offered choices', function (mixed $days) 
     'missing' => [''],
     'not offered' => ['4'],
     'not a number' => ['week'],
-]);
-
-test('changing which setups scans keep saves it and queues a rescan', function () {
-    Queue::fake([RunGridScan::class]);
-    $user = User::factory()->create();
-
-    $this->actingAs($user)
-        ->patch(route('grid-settings.update'), [
-            'total_margin' => '1000',
-            'spacing_multiplier' => '0.6',
-            'allow_trailing' => '1',
-            'range_horizon_days' => '7',
-            'minimum_grade' => 'B',
-            'mode_filter' => 'short',
-        ])
-        ->assertSessionHasNoErrors();
-
-    expect(AppSetting::minimumGrade())->toBe(GridGrade::B)
-        ->and(AppSetting::modeFilter())->toBe(GridMode::Short);
-    Queue::assertPushed(RunGridScan::class);
-});
-
-test('setting bot types back to all clears the filter', function () {
-    Queue::fake([RunGridScan::class]);
-    AppSetting::setModeFilter(GridMode::Long);
-    $user = User::factory()->create();
-
-    $this->actingAs($user)
-        ->patch(route('grid-settings.update'), [
-            'total_margin' => '1000',
-            'spacing_multiplier' => '0.6',
-            'allow_trailing' => '1',
-            'range_horizon_days' => '7',
-            'minimum_grade' => 'C',
-            'mode_filter' => 'all',
-        ])
-        ->assertSessionHasNoErrors();
-
-    expect(AppSetting::modeFilter())->toBeNull();
-    Queue::assertPushed(RunGridScan::class);
-});
-
-test('scan result filters must be offered choices', function (string $field, string $value) {
-    Queue::fake([RunGridScan::class]);
-    $user = User::factory()->create();
-
-    $this->actingAs($user)
-        ->patch(route('grid-settings.update'), [
-            'total_margin' => '1000',
-            'spacing_multiplier' => '0.6',
-            'allow_trailing' => '1',
-            'range_horizon_days' => '7',
-            'minimum_grade' => 'C',
-            'mode_filter' => 'all',
-            $field => $value,
-        ])
-        ->assertSessionHasErrors($field);
-
-    Queue::assertNotPushed(RunGridScan::class);
-})->with([
-    'unknown grade' => ['minimum_grade', 'D'],
-    'unknown bot type' => ['mode_filter', 'hedge'],
 ]);
 
 test('total margin must be a valid amount', function (mixed $totalMargin) {
@@ -232,8 +154,6 @@ test('total margin must be a valid amount', function (mixed $totalMargin) {
             'spacing_multiplier' => '0.6',
             'allow_trailing' => '1',
             'range_horizon_days' => '7',
-            'minimum_grade' => 'C',
-            'mode_filter' => 'all',
         ]);
 
     $response
@@ -260,8 +180,6 @@ test('spacing multiplier must be within range', function (mixed $spacingMultipli
             'spacing_multiplier' => $spacingMultiplier,
             'allow_trailing' => '1',
             'range_horizon_days' => '7',
-            'minimum_grade' => 'C',
-            'mode_filter' => 'all',
         ]);
 
     $response->assertSessionHasErrors('spacing_multiplier');

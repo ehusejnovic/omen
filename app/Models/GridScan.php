@@ -18,15 +18,13 @@ use Illuminate\Support\Carbon;
  * @property int $suggestions_count
  * @property float|null $spacing_multiplier
  * @property int|null $range_horizon_days
- * @property string|null $minimum_grade
- * @property string|null $mode_filter
  * @property string|null $error
  * @property Carbon $started_at
  * @property Carbon|null $finished_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['status', 'symbols_scanned', 'suggestions_count', 'spacing_multiplier', 'range_horizon_days', 'minimum_grade', 'mode_filter', 'error', 'started_at', 'finished_at'])]
+#[Fillable(['status', 'symbols_scanned', 'suggestions_count', 'spacing_multiplier', 'range_horizon_days', 'error', 'started_at', 'finished_at'])]
 class GridScan extends Model
 {
     /** @use HasFactory<GridScanFactory> */
