@@ -18,6 +18,23 @@ export function formatUsdt(value: number): string {
     });
 }
 
+export function signedUsdt(value: number): string {
+    return `${value > 0 ? '+' : ''}${formatUsdt(value)}`;
+}
+
+/**
+ * Text colour for a profit or loss; neutral for zero or no value.
+ */
+export function pnlClass(value: number | null): string {
+    if (value === null || value === 0) {
+        return '';
+    }
+
+    return value > 0
+        ? 'text-emerald-600 dark:text-emerald-400'
+        : 'text-rose-600 dark:text-rose-400';
+}
+
 export function formatPct(value: number, digits = 2, signed = false): string {
     const formatted = `${value.toFixed(digits)}%`;
 

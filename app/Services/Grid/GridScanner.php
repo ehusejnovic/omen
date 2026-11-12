@@ -19,6 +19,7 @@ class GridScanner
         private GridAnalyzer $analyzer,
         private BtcSensitivity $btcSensitivity,
         private DailyTrend $dailyTrend,
+        private SetupAlerts $setupAlerts,
     ) {}
 
     /**
@@ -132,6 +133,8 @@ class GridScanner
 
             throw $exception;
         }
+
+        $this->setupAlerts->notify($scan);
 
         return $scan;
     }

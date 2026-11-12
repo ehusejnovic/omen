@@ -3,7 +3,6 @@
 use App\Enums\GridGrade;
 use App\Enums\GridMode;
 use App\Models\GridTrade;
-use App\Models\SymbolStat;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -38,7 +37,7 @@ it('redirects guests to the login page', function () {
     $this->get(route('grid-trades.index'))->assertRedirect(route('login'));
 });
 
-it('lists only the user\'s own trades with journal totals', function () {
+it('lists only the user\'s own trades, newest first', function () {
     $this->freezeTime();
     $user = User::factory()->create();
     GridTrade::factory()->for($user)->create([
@@ -73,12 +72,7 @@ it('lists only the user\'s own trades with journal totals', function () {
             ->where('trades.1.symbol', 'LOSSUSDT')
             ->where('trades.1.duration_seconds', 12 * 3600)
             ->where('trades.1.roi_pct', -5.5)
-            ->where('summary.total_trades', 3)
-            ->where('summary.running_trades', 1)
-            ->where('summary.total_pnl', 14.5)
-            ->where('summary.win_rate_pct', 50)
-            ->where('summary.total_matched_trades', 44)
-            ->where('summary.average_duration_seconds', 30 * 3600));
+            ->where('rangeHorizonOptions', [3, 5, 7]));
 });
 
 it('journals a trade for the signed-in user', function () {
@@ -210,88 +204,4 @@ it('forbids deleting another user\'s trade', function () {
         ->assertForbidden();
 
     $this->assertModelExists($trade);
-});
-
-function seedRunningPortfolio(User $user): void
-{
-    SymbolStat::factory()->create(['symbol' => 'BTCUSDT', 'beta' => 1, 'shock_beta_down' => 1, 'shock_beta_up' => 1, 'btc_shock_pct' => 5]);
-    SymbolStat::factory()->create(['symbol' => 'ALTUSDT', 'beta' => 1.2, 'shock_beta_down' => 1.5, 'shock_beta_up' => 1.1, 'btc_shock_pct' => 5]);
-    SymbolStat::factory()->create(['symbol' => 'MEMEUSDT', 'beta' => 2, 'shock_beta_down' => 2, 'shock_beta_up' => 2, 'btc_shock_pct' => 5]);
-
-    GridTrade::factory()->for($user)->running()->create(['symbol' => 'ALTUSDT', 'mode' => GridMode::Long, 'margin' => 100, 'leverage' => 5]);
-    GridTrade::factory()->for($user)->running()->create(['symbol' => 'BTCUSDT', 'mode' => GridMode::Short, 'margin' => 100, 'leverage' => 2]);
-    GridTrade::factory()->for($user)->running()->create(['symbol' => 'MEMEUSDT', 'mode' => GridMode::Normal, 'margin' => 100, 'leverage' => 4]);
-    GridTrade::factory()->for($user)->running()->create(['symbol' => 'NEWUSDT', 'mode' => GridMode::Long]);
-    GridTrade::factory()->for($user)->create(['symbol' => 'ALTUSDT', 'mode' => GridMode::Long, 'margin' => 5000, 'leverage' => 10]);
-}
-
-it('estimates how running bots react together to a sudden BTC move', function () {
-    $user = User::factory()->create(['total_margin' => 1000]);
-    seedRunningPortfolio($user);
-
-    $this->actingAs($user)
-        ->get(route('grid-trades.index'))
-        ->assertInertia(fn (Assert $page) => $page
-            ->where('exposure.btc_shock_pct', 5)
-            ->where('exposure.measured_trades', 3)
-            ->where('exposure.unmeasured_symbols', ['NEWUSDT'])
-            ->where('exposure.net_beta_exposure', 400)
-            ->where('exposure.down_shock_pnl', -47.5)
-            ->where('exposure.up_shock_pnl', -2.5)
-            ->where('exposure.worst_shock_pnl', -47.5)
-            ->where('exposure.worst_shock_pct_of_margin', 4.75)
-            ->where('exposure.exceeds_limit', false)
-            ->has('exposure.betas', 3));
-});
-
-it('warns when a sudden BTC move could cost more than the portfolio limit', function () {
-    $user = User::factory()->create(['total_margin' => 200]);
-    seedRunningPortfolio($user);
-
-    $this->actingAs($user)
-        ->get(route('grid-trades.index'))
-        ->assertInertia(fn (Assert $page) => $page
-            ->where('exposure.worst_shock_pct_of_margin', 23.75)
-            ->where('exposure.exceeds_limit', true));
-});
-
-it('omits BTC exposure when no bots are running', function () {
-    $user = User::factory()->create();
-    GridTrade::factory()->for($user)->create();
-
-    $this->actingAs($user)
-        ->get(route('grid-trades.index'))
-        ->assertInertia(fn (Assert $page) => $page->where('exposure', null));
-});
-
-it('compares results per range horizon, with trades without a horizon last', function () {
-    $this->freezeTime();
-    $user = User::factory()->create();
-    GridTrade::factory()->for($user)->create(['range_horizon_days' => null, 'margin' => 100, 'pnl' => 3, 'matched_trades' => 4, 'started_at' => now()->subDays(2), 'ended_at' => now()->subDay()]);
-    GridTrade::factory()->for($user)->create(['range_horizon_days' => 7, 'margin' => 100, 'matched_trades' => 6, 'pnl' => null, 'started_at' => now()->subHours(12), 'ended_at' => null]);
-    GridTrade::factory()->for($user)->create(['range_horizon_days' => 5, 'margin' => 100, 'pnl' => 10, 'matched_trades' => 20, 'started_at' => now()->subDays(3), 'ended_at' => now()->subDay()]);
-    GridTrade::factory()->for($user)->create(['range_horizon_days' => 5, 'margin' => 100, 'pnl' => -5, 'matched_trades' => 10, 'started_at' => now()->subDays(2), 'ended_at' => now()->subDay()]);
-    GridTrade::factory()->create(['range_horizon_days' => 3]);
-
-    $this->actingAs($user)
-        ->get(route('grid-trades.index'))
-        ->assertInertia(fn (Assert $page) => $page
-            ->where('rangeHorizonOptions', [3, 5, 7])
-            ->has('byHorizon', 3)
-            ->where('byHorizon.0', [
-                'range_horizon_days' => 5,
-                'trades' => 2,
-                'closed_with_pnl' => 2,
-                'total_pnl' => 5,
-                'win_rate_pct' => 50,
-                'average_roi_pct' => 2.5,
-                'matched_per_day' => 10,
-            ])
-            ->where('byHorizon.1.range_horizon_days', 7)
-            ->where('byHorizon.1.closed_with_pnl', 0)
-            ->where('byHorizon.1.win_rate_pct', null)
-            ->where('byHorizon.1.matched_per_day', 12)
-            ->where('byHorizon.2.range_horizon_days', null)
-            ->where('byHorizon.2.average_roi_pct', 3)
-            ->where('byHorizon.2.matched_per_day', 4));
 });

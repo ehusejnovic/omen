@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { Grid3x3, NotebookPen, Settings2 } from 'lucide-react';
+import { ChartLine, Grid3x3, NotebookPen, Settings2 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -12,7 +12,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard } from '@/routes';
+import { analytics, dashboard } from '@/routes';
 import { edit as editGridSettings } from '@/routes/grid-settings';
 import { index as journal } from '@/routes/grid-trades';
 import type { NavItem } from '@/types';
@@ -27,6 +27,11 @@ const mainNavItems: NavItem[] = [
         title: 'Trade journal',
         href: journal(),
         icon: NotebookPen,
+    },
+    {
+        title: 'Analytics',
+        href: analytics(),
+        icon: ChartLine,
     },
     {
         title: 'Grid bot settings',

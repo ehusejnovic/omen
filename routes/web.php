@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\GridScannerController;
 use App\Http\Controllers\GridTradeController;
 use Illuminate\Support\Facades\Route;
@@ -15,6 +16,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->only(['index', 'store', 'update', 'destroy'])
         ->parameters(['journal' => 'gridTrade'])
         ->names('grid-trades');
+    Route::get('analytics', [AnalyticsController::class, 'index'])->name('analytics');
 });
 
 require __DIR__.'/settings.php';

@@ -6,17 +6,13 @@ import {
     Pencil,
     Plus,
     Trash2,
-    TriangleAlert,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
 import GridTradeController from '@/actions/App/Http/Controllers/GridTradeController';
 import { GradeBadge, ModeBadge } from '@/components/grid-badges';
 import GridTradeDialog from '@/components/grid-trade-dialog';
-import PnlCurve from '@/components/pnl-curve';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -30,29 +26,12 @@ import {
     formatDuration,
     formatPct,
     formatUsdt,
+    pnlClass,
+    signedUsdt,
 } from '@/lib/grid-format';
 import { cn } from '@/lib/utils';
 import { index as journalIndex } from '@/routes/grid-trades';
-import type {
-    GridTrade,
-    JournalExposure,
-    JournalHorizonResult,
-    JournalSummary,
-} from '@/types';
-
-function pnlClass(value: number | null): string {
-    if (value === null || value === 0) {
-        return '';
-    }
-
-    return value > 0
-        ? 'text-emerald-600 dark:text-emerald-400'
-        : 'text-rose-600 dark:text-rose-400';
-}
-
-function signedUsdt(value: number): string {
-    return `${value > 0 ? '+' : ''}${formatUsdt(value)}`;
-}
+import type { GridTrade } from '@/types';
 
 type SortKey =
     | 'symbol'
@@ -142,50 +121,11 @@ function SortableHeader({
     );
 }
 
-function StatCard({
-    label,
-    value,
-    hint,
-    className,
-}: {
-    label: string;
-    value: ReactNode;
-    hint?: ReactNode;
-    className?: string;
-}) {
-    return (
-        <Card className="gap-1 py-4">
-            <CardContent className="space-y-1 px-4">
-                <p className="text-xs text-muted-foreground">{label}</p>
-                <p
-                    className={cn(
-                        'text-xl font-semibold tabular-nums',
-                        className,
-                    )}
-                >
-                    {value}
-                </p>
-                {hint && (
-                    <p className="text-xs text-muted-foreground">{hint}</p>
-                )}
-            </CardContent>
-        </Card>
-    );
-}
-
 export default function Journal({
     trades,
-    summary,
-    exposure,
-    maxPortfolioShockLossPct,
-    byHorizon,
     rangeHorizonOptions,
 }: {
     trades: GridTrade[];
-    summary: JournalSummary;
-    exposure: JournalExposure | null;
-    maxPortfolioShockLossPct: number;
-    byHorizon: JournalHorizonResult[];
     rangeHorizonOptions: number[];
 }) {
     const [editorOpen, setEditorOpen] = useState(false);
@@ -248,8 +188,8 @@ export default function Journal({
                             Trade journal
                         </h1>
                         <p className="text-sm text-muted-foreground">
-                            Grid bots you've run, with matched trades, PnL and
-                            duration.
+                            Grid bots you've run, with matched trades, PnL,
+                            duration and notes.
                         </p>
                     </div>
                     <Button onClick={() => openEditor(null)}>
@@ -257,247 +197,6 @@ export default function Journal({
                         Journal trade
                     </Button>
                 </div>
-
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <StatCard
-                        label="Total PnL"
-                        value={`${signedUsdt(summary.total_pnl)} USDT`}
-                        className={pnlClass(summary.total_pnl)}
-                        hint={`${summary.total_trades} trades · ${summary.running_trades} running`}
-                    />
-                    <StatCard
-                        label="Win rate"
-                        value={
-                            summary.win_rate_pct === null
-                                ? '–'
-                                : formatPct(summary.win_rate_pct, 1)
-                        }
-                        hint="Closed trades with a recorded PnL"
-                    />
-                    <StatCard
-                        label="Matched trades"
-                        value={summary.total_matched_trades.toLocaleString(
-                            'en-US',
-                        )}
-                        hint="Across all bots"
-                    />
-                    <StatCard
-                        label="Average duration"
-                        value={
-                            summary.average_duration_seconds === null
-                                ? '–'
-                                : formatDuration(
-                                      summary.average_duration_seconds,
-                                  )
-                        }
-                        hint="Closed trades"
-                    />
-                </div>
-
-                <Card className="gap-3 py-4">
-                    <CardContent className="px-4">
-                        <PnlCurve trades={trades} />
-                    </CardContent>
-                </Card>
-
-                {byHorizon.length > 0 && (
-                    <Card className="gap-3 py-4">
-                        <CardContent className="space-y-3 px-4">
-                            <div className="flex flex-wrap items-baseline justify-between gap-2">
-                                <h2 className="text-sm font-semibold">
-                                    By range horizon
-                                </h2>
-                                <p className="text-xs text-muted-foreground">
-                                    PnL, win rate and ROI count finished trades
-                                    with a PnL; matched trades per day count
-                                    every trade
-                                </p>
-                            </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead className="text-left text-xs text-muted-foreground">
-                                        <tr className="[&>th]:py-1.5 [&>th]:pr-4 [&>th]:font-medium [&>th]:whitespace-nowrap">
-                                            <th>Horizon</th>
-                                            <th className="text-right">
-                                                Trades
-                                            </th>
-                                            <th className="text-right">
-                                                Total PnL
-                                            </th>
-                                            <th className="text-right">
-                                                Win rate
-                                            </th>
-                                            <th className="text-right">
-                                                Avg ROI
-                                            </th>
-                                            <th className="text-right">
-                                                Matched / day
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border/60">
-                                        {byHorizon.map((row) => (
-                                            <tr
-                                                key={
-                                                    row.range_horizon_days ??
-                                                    'none'
-                                                }
-                                                className="[&>td]:py-1.5 [&>td]:pr-4 [&>td]:whitespace-nowrap"
-                                            >
-                                                <td className="font-medium">
-                                                    {row.range_horizon_days ===
-                                                    null
-                                                        ? 'Not set'
-                                                        : `${row.range_horizon_days} days`}
-                                                </td>
-                                                <td className="text-right tabular-nums">
-                                                    {row.trades}
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {' '}
-                                                        ({
-                                                            row.closed_with_pnl
-                                                        }{' '}
-                                                        closed)
-                                                    </span>
-                                                </td>
-                                                <td
-                                                    className={cn(
-                                                        'text-right tabular-nums',
-                                                        pnlClass(row.total_pnl),
-                                                    )}
-                                                >
-                                                    {signedUsdt(row.total_pnl)}
-                                                </td>
-                                                <td className="text-right tabular-nums">
-                                                    {row.win_rate_pct === null
-                                                        ? '–'
-                                                        : formatPct(
-                                                              row.win_rate_pct,
-                                                              1,
-                                                          )}
-                                                </td>
-                                                <td
-                                                    className={cn(
-                                                        'text-right tabular-nums',
-                                                        pnlClass(
-                                                            row.average_roi_pct,
-                                                        ),
-                                                    )}
-                                                >
-                                                    {row.average_roi_pct ===
-                                                    null
-                                                        ? '–'
-                                                        : formatPct(
-                                                              row.average_roi_pct,
-                                                              2,
-                                                              true,
-                                                          )}
-                                                </td>
-                                                <td className="text-right tabular-nums">
-                                                    {row.matched_per_day ?? '–'}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {exposure && (
-                    <Card
-                        className={cn(
-                            'gap-3 py-4',
-                            exposure.exceeds_limit &&
-                                'border-amber-300 dark:border-amber-800',
-                        )}
-                    >
-                        <CardContent className="space-y-3 px-4">
-                            <div className="flex flex-wrap items-baseline justify-between gap-2">
-                                <h2 className="text-sm font-semibold">
-                                    BTC exposure of running bots
-                                </h2>
-                                <p className="text-xs text-muted-foreground">
-                                    {exposure.measured_trades} running{' '}
-                                    {exposure.measured_trades === 1
-                                        ? 'bot'
-                                        : 'bots'}{' '}
-                                    measured
-                                    {exposure.btc_shock_pct !== null &&
-                                        ` · BTC shock = ${formatPct(exposure.btc_shock_pct, 1)} sudden move`}
-                                </p>
-                            </div>
-
-                            {exposure.exceeds_limit && (
-                                <p className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400">
-                                    <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-                                    A sudden BTC move could cost your running
-                                    bots about{' '}
-                                    {formatPct(
-                                        exposure.worst_shock_pct_of_margin ?? 0,
-                                        1,
-                                    )}{' '}
-                                    of your total margin, above the{' '}
-                                    {formatPct(maxPortfolioShockLossPct, 0)}{' '}
-                                    limit. They mostly move together with BTC,
-                                    so consider fewer high-beta bots or a Short
-                                    bot as a partial hedge.
-                                </p>
-                            )}
-
-                            <div className="grid gap-4 text-sm sm:grid-cols-3">
-                                <div>
-                                    <p className="text-xs text-muted-foreground">
-                                        Net BTC exposure
-                                    </p>
-                                    <p className="font-semibold tabular-nums">
-                                        {signedUsdt(exposure.net_beta_exposure)}{' '}
-                                        USDT
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        Long minus Short position size, weighted
-                                        by beta
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-muted-foreground">
-                                        If BTC suddenly falls
-                                    </p>
-                                    <p
-                                        className={cn(
-                                            'font-semibold tabular-nums',
-                                            pnlClass(exposure.down_shock_pnl),
-                                        )}
-                                    >
-                                        {signedUsdt(exposure.down_shock_pnl)}{' '}
-                                        USDT
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-muted-foreground">
-                                        If BTC suddenly rallies
-                                    </p>
-                                    <p
-                                        className={cn(
-                                            'font-semibold tabular-nums',
-                                            pnlClass(exposure.up_shock_pnl),
-                                        )}
-                                    >
-                                        {signedUsdt(exposure.up_shock_pnl)} USDT
-                                    </p>
-                                </div>
-                            </div>
-
-                            {exposure.unmeasured_symbols.length > 0 && (
-                                <p className="text-xs text-muted-foreground">
-                                    Not included (outside the top 100 scanned):{' '}
-                                    {exposure.unmeasured_symbols.join(', ')}
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
 
                 <div className="overflow-x-auto rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
                     <table className="w-full text-sm">
@@ -577,16 +276,6 @@ export default function Journal({
                                                 />
                                             )}
                                         </div>
-                                        {exposure?.betas[trade.id] !==
-                                            undefined && (
-                                            <div className="text-xs text-muted-foreground tabular-nums">
-                                                β{' '}
-                                                {exposure.betas[
-                                                    trade.id
-                                                ].toFixed(2)}{' '}
-                                                to BTC
-                                            </div>
-                                        )}
                                     </td>
                                     <td>
                                         <ModeBadge mode={trade.mode} />

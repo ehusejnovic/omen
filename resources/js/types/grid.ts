@@ -105,16 +105,65 @@ export type GridTrade = {
     notes: string | null;
 };
 
-export type JournalSummary = {
+export type TradeSummaryItem = {
+    id: number;
+    symbol: string;
+    pnl: number;
+    roi_pct: number;
+};
+
+export type AnalyticsSummary = {
     total_trades: number;
     running_trades: number;
+    closed_trades: number;
     total_pnl: number;
+    wins: number;
+    losses: number;
     win_rate_pct: number | null;
+    gross_profit: number;
+    gross_loss: number;
+    profit_factor: number | null;
+    average_win: number | null;
+    average_loss: number | null;
+    expectancy: number | null;
+    average_roi_pct: number | null;
+    daily_return_pct: number | null;
+    max_drawdown: number;
+    longest_win_streak: number;
+    longest_loss_streak: number;
+    best_trade: TradeSummaryItem | null;
+    worst_trade: TradeSummaryItem | null;
     total_matched_trades: number;
     average_duration_seconds: number | null;
 };
 
-export type JournalExposure = {
+export type PnlBreakdown = {
+    trades: number;
+    profitable: number;
+    pnl: number;
+    matched_profit: number;
+    position_pnl: number;
+    unsplit_trades: number;
+    unsplit_pnl: number;
+};
+
+export type AnalyticsRow = {
+    label: string;
+    trades: number;
+    closed_with_pnl: number;
+    total_pnl: number;
+    win_rate_pct: number | null;
+    average_roi_pct: number | null;
+    profit_factor: number | null;
+    matched_per_day: number | null;
+};
+
+export type AnalyticsBreakdowns = Record<
+    'grade' | 'leverage' | 'horizon' | 'duration' | 'mode',
+    AnalyticsRow[]
+>;
+
+export type PortfolioExposure = {
     btc_shock_pct: number | null;
     net_beta_exposure: number;
     down_shock_pnl: number;
@@ -125,14 +174,4 @@ export type JournalExposure = {
     measured_trades: number;
     unmeasured_symbols: string[];
     betas: Record<number, number>;
-};
-
-export type JournalHorizonResult = {
-    range_horizon_days: number | null;
-    trades: number;
-    closed_with_pnl: number;
-    total_pnl: number;
-    win_rate_pct: number | null;
-    average_roi_pct: number | null;
-    matched_per_day: number | null;
 };
