@@ -2,9 +2,16 @@
 
 use App\Enums\GridGrade;
 use App\Enums\GridMode;
+use App\Enums\TradeSource;
+use App\Models\FuturesSymbol;
 use App\Models\GridTrade;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
+
+beforeEach(function () {
+    FuturesSymbol::factory()->create(['symbol' => 'BTCUSDT', 'base_asset' => 'BTC']);
+    FuturesSymbol::factory()->create(['symbol' => 'ETHUSDT', 'base_asset' => 'ETH']);
+});
 
 /**
  * @return array<string, mixed>
@@ -14,6 +21,7 @@ function journalPayload(array $overrides = []): array
     return [
         'symbol' => ' btcusdt ',
         'mode' => 'long',
+        'source' => 'scanner',
         'suggested_grade' => 'A',
         'margin' => '250.50',
         'leverage' => 5,
@@ -75,6 +83,14 @@ it('lists only the user\'s own trades, newest first', function () {
             ->where('rangeHorizonOptions', [3, 5, 7]));
 });
 
+it('offers only the Binance symbols that are still trading', function () {
+    FuturesSymbol::factory()->delisted()->create(['symbol' => 'GONEUSDT']);
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('grid-trades.index'))
+        ->assertInertia(fn (Assert $page) => $page->where('symbols', ['BTCUSDT', 'ETHUSDT']));
+});
+
 it('journals a trade for the signed-in user', function () {
     $user = User::factory()->create();
 
@@ -86,7 +102,9 @@ it('journals a trade for the signed-in user', function () {
     $trade = $user->gridTrades()->sole();
 
     expect($trade->symbol)->toBe('BTCUSDT')
+        ->and($trade->futuresSymbol->base_asset)->toBe('BTC')
         ->and($trade->mode)->toBe(GridMode::Long)
+        ->and($trade->source)->toBe(TradeSource::Scanner)
         ->and($trade->suggested_grade)->toBe(GridGrade::A)
         ->and($trade->margin)->toBe(250.5)
         ->and($trade->trailing_up)->toBeTrue()
@@ -106,6 +124,7 @@ it('journals a running trade with only the required fields', function () {
         ->post(route('grid-trades.store'), [
             'symbol' => 'ETHUSDT',
             'mode' => 'normal',
+            'source' => 'manual',
             'margin' => 100,
             'leverage' => 3,
             'trailing_up' => false,
@@ -124,6 +143,30 @@ it('journals a running trade with only the required fields', function () {
         ->and($trade->lower_price)->toBeNull();
 });
 
+it('journals a manual trade the scanner never suggested', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('grid-trades.store'), journalPayload(['source' => 'manual', 'suggested_grade' => null]))
+        ->assertSessionHasNoErrors();
+
+    $trade = $user->gridTrades()->sole();
+
+    expect($trade->source)->toBe(TradeSource::Manual)
+        ->and($trade->suggested_grade)->toBeNull();
+
+    $this->actingAs($user)
+        ->get(route('grid-trades.index'))
+        ->assertInertia(fn (Assert $page) => $page->where('trades.0.source', 'manual'));
+});
+
+it('lists the trades journaled on a Binance symbol', function () {
+    $trade = GridTrade::factory()->create(['symbol' => 'BTCUSDT']);
+    GridTrade::factory()->create(['symbol' => 'ETHUSDT']);
+
+    expect(FuturesSymbol::query()->find('BTCUSDT')->gridTrades->modelKeys())->toBe([$trade->id]);
+});
+
 it('rejects invalid trades', function (array $overrides, string $field) {
     $user = User::factory()->create();
 
@@ -140,6 +183,10 @@ it('rejects invalid trades', function (array $overrides, string $field) {
     'missing margin' => [['margin' => ''], 'margin'],
     'unknown bot mode' => [['mode' => 'hedge'], 'mode'],
     'invalid symbol' => [['symbol' => 'BTC/USDT'], 'symbol'],
+    'symbol not listed on Binance' => [['symbol' => 'NOPEUSDT'], 'symbol'],
+    'missing source' => [['source' => null], 'source'],
+    'unknown source' => [['source' => 'copy'], 'source'],
+    'manual trade with a suggested grade' => [['source' => 'manual'], 'suggested_grade'],
     'missing trailing flag' => [['trailing_up' => null], 'trailing_up'],
     'matched profit not a number' => [['matched_profit' => 'lots'], 'matched_profit'],
     'matched profit with too many decimals' => [['matched_profit' => '1.234'], 'matched_profit'],

@@ -148,6 +148,21 @@ it('orders leverage, horizon, duration and mode groups', function () {
             ->where('breakdowns.mode', fn ($rows) => collect($rows)->pluck('label')->all() === ['Normal', 'Long', 'Short']));
 });
 
+it('compares scanner suggestions with manually set up grids', function () {
+    $user = User::factory()->create();
+    GridTrade::factory()->for($user)->create(['pnl' => -2]);
+    GridTrade::factory()->for($user)->fromScanner()->create(['pnl' => 6]);
+    GridTrade::factory()->for($user)->fromScanner()->create(['pnl' => 4]);
+
+    $this->actingAs($user)
+        ->get(route('analytics'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('breakdowns.source.0.label', 'Scanner')
+            ->where('breakdowns.source.0.total_pnl', 10)
+            ->where('breakdowns.source.1.label', 'Manual')
+            ->where('breakdowns.source.1.total_pnl', -2));
+});
+
 it('ranks pairs by total PnL', function () {
     $user = User::factory()->create();
     GridTrade::factory()->for($user)->create(['symbol' => 'ZECUSDT', 'pnl' => 5]);

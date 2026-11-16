@@ -26,6 +26,7 @@ type Dimension = keyof AnalyticsBreakdowns;
 
 const dimensions: { value: Dimension; label: string; column: string }[] = [
     { value: 'grade', label: 'Grade', column: 'Suggested grade' },
+    { value: 'source', label: 'Source', column: 'Source' },
     { value: 'leverage', label: 'Leverage', column: 'Leverage' },
     { value: 'horizon', label: 'Range horizon', column: 'Horizon' },
     { value: 'duration', label: 'Duration', column: 'Duration' },

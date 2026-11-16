@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\GridGrade;
 use App\Enums\GridMode;
+use App\Enums\TradeSource;
 use Database\Factories\GridTradeFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property int $user_id
  * @property string $symbol
  * @property GridMode $mode
+ * @property TradeSource $source
  * @property GridGrade|null $suggested_grade
  * @property float $margin
  * @property int $leverage
@@ -36,7 +38,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['symbol', 'mode', 'suggested_grade', 'margin', 'leverage', 'lower_price', 'upper_price', 'grid_count', 'trailing_up', 'trailing_down', 'range_horizon_days', 'matched_trades', 'matched_profit', 'pnl', 'started_at', 'ended_at', 'notes'])]
+#[Fillable(['symbol', 'mode', 'source', 'suggested_grade', 'margin', 'leverage', 'lower_price', 'upper_price', 'grid_count', 'trailing_up', 'trailing_down', 'range_horizon_days', 'matched_trades', 'matched_profit', 'pnl', 'started_at', 'ended_at', 'notes'])]
 class GridTrade extends Model
 {
     /** @use HasFactory<GridTradeFactory> */
@@ -51,6 +53,7 @@ class GridTrade extends Model
     {
         return [
             'mode' => GridMode::class,
+            'source' => TradeSource::class,
             'suggested_grade' => GridGrade::class,
             'margin' => 'float',
             'lower_price' => 'float',
@@ -70,6 +73,14 @@ class GridTrade extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return BelongsTo<FuturesSymbol, $this>
+     */
+    public function futuresSymbol(): BelongsTo
+    {
+        return $this->belongsTo(FuturesSymbol::class, 'symbol', 'symbol');
     }
 
     /**

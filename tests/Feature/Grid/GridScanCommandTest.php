@@ -2,6 +2,7 @@
 
 use App\Enums\GridMode;
 use App\Models\AppSetting;
+use App\Models\FuturesSymbol;
 use App\Models\GridScan;
 use App\Models\SymbolStat;
 use Illuminate\Http\Client\Request;
@@ -115,6 +116,19 @@ it('stores a suggestion for each perpetual whose candles loaded', function () {
 
     Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'symbol=USDCUSDT')
         || str_contains($request->url(), 'symbol=BTCUSDT_261225'));
+});
+
+it('syncs the tradable perpetual symbols for the journal while scanning', function () {
+    Http::preventStrayRequests();
+    FuturesSymbol::factory()->create(['symbol' => 'GONEUSDT']);
+    fakeBinanceMarket();
+
+    $this->artisan('grid:scan')->assertSuccessful();
+
+    expect(FuturesSymbol::query()->where('is_trading', true)->orderBy('symbol')->pluck('symbol')->all())
+        ->toBe(['BTCUSDT', 'ETHUSDT', 'USDCUSDT'])
+        ->and(FuturesSymbol::query()->find('GONEUSDT')->is_trading)->toBeFalse()
+        ->and(FuturesSymbol::query()->find('BTCUSDT')->tick_size)->toBe(0.1);
 });
 
 it('marks the scan as failed when Binance market data cannot be loaded', function () {

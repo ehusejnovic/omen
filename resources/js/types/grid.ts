@@ -2,6 +2,8 @@ export type GridMode = 'normal' | 'long' | 'short';
 
 export type GridGrade = 'A+' | 'A' | 'B+' | 'B' | 'C+' | 'C';
 
+export type TradeSource = 'scanner' | 'manual';
+
 export type EntryTrigger = 'immediate' | 'below' | 'above';
 
 export type GridScan = {
@@ -86,6 +88,7 @@ export type GridTrade = {
     id: number;
     symbol: string;
     mode: GridMode;
+    source: TradeSource;
     suggested_grade: GridGrade | null;
     margin: number;
     leverage: number;
@@ -159,7 +162,7 @@ export type AnalyticsRow = {
 };
 
 export type AnalyticsBreakdowns = Record<
-    'grade' | 'leverage' | 'horizon' | 'duration' | 'mode',
+    'grade' | 'source' | 'leverage' | 'horizon' | 'duration' | 'mode',
     AnalyticsRow[]
 >;
 

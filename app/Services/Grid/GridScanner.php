@@ -3,6 +3,7 @@
 namespace App\Services\Grid;
 
 use App\Models\AppSetting;
+use App\Models\FuturesSymbol;
 use App\Models\GridScan;
 use App\Models\SymbolStat;
 use App\Services\Binance\BinanceFuturesClient;
@@ -49,6 +50,7 @@ class GridScanner
 
         try {
             $contracts = $this->binance->perpetualContracts();
+            FuturesSymbol::syncFromContracts($contracts);
             $tickers = $this->binance->tickers();
             $fundingRates = $this->binance->fundingRates();
             $excluded = config('grid.excluded_base_assets');

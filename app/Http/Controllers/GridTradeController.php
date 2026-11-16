@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\GridTradeRequest;
 use App\Http\Resources\GridTradeResource;
+use App\Models\FuturesSymbol;
 use App\Models\GridTrade;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class GridTradeController extends Controller
         return Inertia::render('journal', [
             'trades' => GridTradeResource::collection($trades)->resolve($request),
             'rangeHorizonOptions' => config('grid.range_horizons'),
+            'symbols' => FuturesSymbol::query()->where('is_trading', true)->orderBy('symbol')->pluck('symbol'),
         ]);
     }
 
