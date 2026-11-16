@@ -6,6 +6,7 @@ use App\Enums\GridGrade;
 use App\Enums\GridMode;
 use App\Enums\TradeSource;
 use App\Models\FuturesSymbol;
+use App\Services\Binance\FuturesSymbolSync;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -17,9 +18,13 @@ class GridTradeRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        $this->merge([
-            'symbol' => strtoupper(trim((string) $this->input('symbol'))),
-        ]);
+        $symbol = strtoupper(trim((string) $this->input('symbol')));
+
+        $this->merge(['symbol' => $symbol]);
+
+        if (preg_match('/^[A-Z0-9]{1,32}$/', $symbol) === 1) {
+            app(FuturesSymbolSync::class)->refreshWhenMissing($symbol);
+        }
     }
 
     /**
@@ -30,7 +35,7 @@ class GridTradeRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'symbol.exists' => __('Pick a Binance USDT perpetual symbol from the list.'),
+            'symbol.exists' => __(':input is not a Binance USDT perpetual symbol.'),
             'suggested_grade.prohibited_if' => __('Manual trades have no suggested grade.'),
         ];
     }

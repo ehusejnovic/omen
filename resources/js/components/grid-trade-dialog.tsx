@@ -13,6 +13,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import SymbolPicker from '@/components/symbol-picker';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -209,29 +210,15 @@ function TradeFormFields({
                     hint={
                         symbols.length > 0
                             ? `${symbols.length} Binance USDT perpetuals`
-                            : undefined
+                            : 'Binance symbol list unavailable, type the symbol'
                     }
                 >
-                    <Input
+                    <SymbolPicker
                         id="symbol"
-                        list={
-                            symbols.length > 0 ? 'futures-symbols' : undefined
-                        }
                         value={data.symbol}
-                        onChange={(event) =>
-                            setData('symbol', event.target.value.toUpperCase())
-                        }
-                        placeholder="BTCUSDT"
-                        autoComplete="off"
-                        required
+                        onChange={(symbol) => setData('symbol', symbol)}
+                        symbols={symbols}
                     />
-                    {symbols.length > 0 && (
-                        <datalist id="futures-symbols">
-                            {symbols.map((symbol) => (
-                                <option key={symbol} value={symbol} />
-                            ))}
-                        </datalist>
-                    )}
                 </Field>
                 <Field label="Bot" htmlFor="mode" error={errors.mode}>
                     <Select

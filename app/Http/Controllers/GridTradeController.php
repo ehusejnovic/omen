@@ -6,6 +6,7 @@ use App\Http\Requests\GridTradeRequest;
 use App\Http\Resources\GridTradeResource;
 use App\Models\FuturesSymbol;
 use App\Models\GridTrade;
+use App\Services\Binance\FuturesSymbolSync;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -17,14 +18,16 @@ class GridTradeController extends Controller
     /**
      * Show the user's trade journal.
      */
-    public function index(Request $request): Response
+    public function index(Request $request, FuturesSymbolSync $symbolSync): Response
     {
+        $symbolSync->refreshWhenMissing();
+
         $trades = $request->user()->gridTrades()->latest('started_at')->latest('id')->get();
 
         return Inertia::render('journal', [
             'trades' => GridTradeResource::collection($trades)->resolve($request),
             'rangeHorizonOptions' => config('grid.range_horizons'),
-            'symbols' => FuturesSymbol::query()->where('is_trading', true)->orderBy('symbol')->pluck('symbol'),
+            'symbols' => FuturesSymbol::tradingSymbols(),
         ]);
     }
 

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * A Binance USDⓈ-M perpetual contract, synced from the exchange so journaled trades reference a real symbol.
@@ -43,6 +44,16 @@ class FuturesSymbol extends Model
             'tick_size' => 'float',
             'is_trading' => 'boolean',
         ];
+    }
+
+    /**
+     * Names of the contracts Binance currently lists, alphabetically.
+     *
+     * @return Collection<int, string>
+     */
+    public static function tradingSymbols(): Collection
+    {
+        return static::query()->where('is_trading', true)->orderBy('symbol')->pluck('symbol');
     }
 
     /**
