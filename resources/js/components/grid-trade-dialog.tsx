@@ -22,11 +22,19 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { fromLocalInput, toLocalInput } from '@/lib/grid-format';
-import type { GridGrade, GridMode, GridSuggestion, GridTrade } from '@/types';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import type {
+    GridGrade,
+    GridMode,
+    GridSuggestion,
+    GridTrade,
+    TradeSource,
+} from '@/types';
 
 type TradeForm = {
     symbol: string;
     mode: GridMode;
+    source: TradeSource;
     suggested_grade: GridGrade | '';
     margin: string;
     leverage: string;
@@ -56,6 +64,7 @@ function initialValues(
         return {
             symbol: trade.symbol,
             mode: trade.mode,
+            source: trade.source,
             suggested_grade: trade.suggested_grade ?? '',
             margin: text(trade.margin),
             leverage: text(trade.leverage),
@@ -77,6 +86,7 @@ function initialValues(
     return {
         symbol: suggestion?.symbol ?? '',
         mode: suggestion?.mode ?? 'normal',
+        source: suggestion ? 'scanner' : 'manual',
         suggested_grade: suggestion?.grade ?? '',
         margin: text(suggestion?.margin),
         leverage: text(suggestion?.leverage),
@@ -122,11 +132,13 @@ function TradeFormFields({
     trade,
     suggestion,
     horizonOptions,
+    symbols,
     onDone,
 }: {
     trade: GridTrade | null;
     suggestion: GridSuggestion | null;
     horizonOptions: number[];
+    symbols: string[];
     onDone: () => void;
 }) {
     const form = useForm<TradeForm>(initialValues(trade, suggestion));
@@ -134,7 +146,8 @@ function TradeFormFields({
 
     form.transform((values) => ({
         ...values,
-        suggested_grade: values.suggested_grade || null,
+        suggested_grade:
+            values.source === 'manual' ? null : values.suggested_grade || null,
         range_horizon_days: values.range_horizon_days || null,
         lower_price: values.lower_price || null,
         upper_price: values.upper_price || null,
@@ -159,17 +172,66 @@ function TradeFormFields({
 
     return (
         <form onSubmit={submit} className="space-y-4">
+            <Field
+                label="Source"
+                htmlFor="source"
+                error={errors.source}
+                hint={
+                    data.source === 'manual'
+                        ? 'A grid you set up yourself, not suggested by the scanner'
+                        : 'A grid suggested by the scanner'
+                }
+            >
+                <ToggleGroup
+                    id="source"
+                    type="single"
+                    variant="outline"
+                    value={data.source}
+                    onValueChange={(value) =>
+                        value && setData('source', value as TradeSource)
+                    }
+                    className="w-full sm:w-auto"
+                >
+                    <ToggleGroupItem value="manual" className="px-4">
+                        Manual
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="scanner" className="px-4">
+                        Scanner suggestion
+                    </ToggleGroupItem>
+                </ToggleGroup>
+            </Field>
+
             <div className="grid gap-4 sm:grid-cols-3">
-                <Field label="Symbol" htmlFor="symbol" error={errors.symbol}>
+                <Field
+                    label="Symbol"
+                    htmlFor="symbol"
+                    error={errors.symbol}
+                    hint={
+                        symbols.length > 0
+                            ? `${symbols.length} Binance USDT perpetuals`
+                            : undefined
+                    }
+                >
                     <Input
                         id="symbol"
+                        list={
+                            symbols.length > 0 ? 'futures-symbols' : undefined
+                        }
                         value={data.symbol}
                         onChange={(event) =>
-                            setData('symbol', event.target.value)
+                            setData('symbol', event.target.value.toUpperCase())
                         }
                         placeholder="BTCUSDT"
+                        autoComplete="off"
                         required
                     />
+                    {symbols.length > 0 && (
+                        <datalist id="futures-symbols">
+                            {symbols.map((symbol) => (
+                                <option key={symbol} value={symbol} />
+                            ))}
+                        </datalist>
+                    )}
                 </Field>
                 <Field label="Bot" htmlFor="mode" error={errors.mode}>
                     <Select
@@ -188,35 +250,39 @@ function TradeFormFields({
                         </SelectContent>
                     </Select>
                 </Field>
-                <Field
-                    label="Suggested grade"
-                    htmlFor="suggested_grade"
-                    error={errors.suggested_grade}
-                >
-                    <Select
-                        value={data.suggested_grade || 'none'}
-                        onValueChange={(value) =>
-                            setData(
-                                'suggested_grade',
-                                value === 'none' ? '' : (value as GridGrade),
-                            )
-                        }
+                {data.source === 'scanner' && (
+                    <Field
+                        label="Suggested grade"
+                        htmlFor="suggested_grade"
+                        error={errors.suggested_grade}
                     >
-                        <SelectTrigger id="suggested_grade">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {(['A+', 'A', 'B+', 'B', 'C+', 'C'] as const).map(
-                                (grade) => (
+                        <Select
+                            value={data.suggested_grade || 'none'}
+                            onValueChange={(value) =>
+                                setData(
+                                    'suggested_grade',
+                                    value === 'none'
+                                        ? ''
+                                        : (value as GridGrade),
+                                )
+                            }
+                        >
+                            <SelectTrigger id="suggested_grade">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                {(
+                                    ['A+', 'A', 'B+', 'B', 'C+', 'C'] as const
+                                ).map((grade) => (
                                     <SelectItem key={grade} value={grade}>
                                         {grade}
                                     </SelectItem>
-                                ),
-                            )}
-                        </SelectContent>
-                    </Select>
-                </Field>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                )}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
@@ -470,12 +536,14 @@ export default function GridTradeDialog({
     trade = null,
     suggestion = null,
     horizonOptions,
+    symbols = [],
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     trade?: GridTrade | null;
     suggestion?: GridSuggestion | null;
     horizonOptions: number[];
+    symbols?: string[];
 }) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -487,7 +555,8 @@ export default function GridTradeDialog({
                             : 'Journal a trade'}
                     </DialogTitle>
                     <DialogDescription>
-                        Record a grid bot you ran on Binance.
+                        Record a grid bot you ran on Binance, from a scanner
+                        suggestion or set up manually.
                     </DialogDescription>
                 </DialogHeader>
                 {open && (
@@ -496,6 +565,7 @@ export default function GridTradeDialog({
                         trade={trade}
                         suggestion={suggestion}
                         horizonOptions={horizonOptions}
+                        symbols={symbols}
                         onDone={() => onOpenChange(false)}
                     />
                 )}

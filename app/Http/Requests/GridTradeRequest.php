@@ -4,6 +4,8 @@ namespace App\Http\Requests;
 
 use App\Enums\GridGrade;
 use App\Enums\GridMode;
+use App\Enums\TradeSource;
+use App\Models\FuturesSymbol;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -21,6 +23,19 @@ class GridTradeRequest extends FormRequest
     }
 
     /**
+     * Get custom messages for validator errors.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'symbol.exists' => __('Pick a Binance USDT perpetual symbol from the list.'),
+            'suggested_grade.prohibited_if' => __('Manual trades have no suggested grade.'),
+        ];
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, ValidationRule|array<mixed>|string>
@@ -28,9 +43,10 @@ class GridTradeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'symbol' => ['required', 'string', 'max:32', 'regex:/^[A-Z0-9]+$/'],
+            'symbol' => ['required', 'string', 'max:32', Rule::exists(FuturesSymbol::class, 'symbol')],
             'mode' => ['required', Rule::enum(GridMode::class)],
-            'suggested_grade' => ['nullable', Rule::enum(GridGrade::class)],
+            'source' => ['required', Rule::enum(TradeSource::class)],
+            'suggested_grade' => ['nullable', 'prohibited_if:source,'.TradeSource::Manual->value, Rule::enum(GridGrade::class)],
             'margin' => ['required', 'numeric', 'gt:0', 'max:100000000', 'decimal:0,2'],
             'leverage' => ['required', 'integer', 'between:1,125'],
             'lower_price' => ['nullable', 'numeric', 'gt:0'],

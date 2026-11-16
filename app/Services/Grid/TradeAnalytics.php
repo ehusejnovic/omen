@@ -4,6 +4,7 @@ namespace App\Services\Grid;
 
 use App\Enums\GridGrade;
 use App\Enums\GridMode;
+use App\Enums\TradeSource;
 use App\Models\GridTrade;
 use Closure;
 use Illuminate\Support\Collection;
@@ -100,12 +101,18 @@ class TradeAnalytics
     {
         $grades = GridGrade::cases();
         $modes = GridMode::cases();
+        $sources = TradeSource::cases();
 
         return [
             'grade' => $this->breakdown(
                 $trades,
                 fn (GridTrade $trade): int => $trade->suggested_grade === null ? PHP_INT_MAX : (int) array_search($trade->suggested_grade, $grades, true),
                 fn (GridTrade $trade): string => $trade->suggested_grade->value ?? 'Not set',
+            ),
+            'source' => $this->breakdown(
+                $trades,
+                fn (GridTrade $trade): int => (int) array_search($trade->source, $sources, true),
+                fn (GridTrade $trade): string => ucfirst($trade->source->value),
             ),
             'leverage' => $this->breakdown(
                 $trades,

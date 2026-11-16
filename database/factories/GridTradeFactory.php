@@ -2,7 +2,10 @@
 
 namespace Database\Factories;
 
+use App\Enums\GridGrade;
 use App\Enums\GridMode;
+use App\Enums\TradeSource;
+use App\Models\FuturesSymbol;
 use App\Models\GridTrade;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -23,6 +26,7 @@ class GridTradeFactory extends Factory
             'user_id' => User::factory(),
             'symbol' => strtoupper(fake()->lexify('???')).'USDT',
             'mode' => fake()->randomElement(GridMode::cases()),
+            'source' => TradeSource::Manual,
             'margin' => 100,
             'leverage' => 5,
             'lower_price' => 90,
@@ -38,6 +42,30 @@ class GridTradeFactory extends Factory
             'ended_at' => now()->subDay(),
             'notes' => null,
         ];
+    }
+
+    /**
+     * Register the trade's symbol as a Binance contract when no test created it, since trades reference it.
+     */
+    public function configure(): static
+    {
+        return $this->afterMaking(function (GridTrade $trade): void {
+            FuturesSymbol::query()->firstOrCreate(
+                ['symbol' => $trade->symbol],
+                ['base_asset' => str($trade->symbol)->beforeLast('USDT')->toString() ?: $trade->symbol],
+            );
+        });
+    }
+
+    /**
+     * Indicate that the bot was suggested by the scanner with the given grade.
+     */
+    public function fromScanner(GridGrade $grade = GridGrade::A): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'source' => TradeSource::Scanner,
+            'suggested_grade' => $grade,
+        ]);
     }
 
     /**

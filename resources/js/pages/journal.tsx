@@ -124,9 +124,11 @@ function SortableHeader({
 export default function Journal({
     trades,
     rangeHorizonOptions,
+    symbols,
 }: {
     trades: GridTrade[];
     rangeHorizonOptions: number[];
+    symbols: string[];
 }) {
     const [editorOpen, setEditorOpen] = useState(false);
     const [editing, setEditing] = useState<GridTrade | null>(null);
@@ -275,6 +277,11 @@ export default function Journal({
                                                     }
                                                 />
                                             )}
+                                            {trade.source === 'manual' && (
+                                                <Badge variant="outline">
+                                                    Manual
+                                                </Badge>
+                                            )}
                                         </div>
                                     </td>
                                     <td>
@@ -401,6 +408,7 @@ export default function Journal({
                 onOpenChange={setEditorOpen}
                 trade={editing}
                 horizonOptions={rangeHorizonOptions}
+                symbols={symbols}
             />
 
             <Dialog

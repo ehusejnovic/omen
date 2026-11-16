@@ -22,6 +22,7 @@ class GridTradeResource extends JsonResource
             'id' => $this->id,
             'symbol' => $this->symbol,
             'mode' => $this->mode,
+            'source' => $this->source,
             'suggested_grade' => $this->suggested_grade,
             'margin' => $this->margin,
             'leverage' => $this->leverage,
