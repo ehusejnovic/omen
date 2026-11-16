@@ -69,12 +69,14 @@ export default function Dashboard({
     isScanning,
     totalMargin,
     rangeHorizonOptions,
+    symbols,
     suggestions,
 }: {
     scan: GridScan | null;
     isScanning: boolean;
     totalMargin: number;
     rangeHorizonOptions: number[];
+    symbols: string[];
     suggestions: GridSuggestion[];
 }) {
     const [mode, setMode] = useState<ModeFilter>('all');
@@ -450,6 +452,7 @@ export default function Dashboard({
                 onOpenChange={(open) => !open && setJournaling(null)}
                 suggestion={journaling}
                 horizonOptions={rangeHorizonOptions}
+                symbols={symbols}
             />
         </>
     );

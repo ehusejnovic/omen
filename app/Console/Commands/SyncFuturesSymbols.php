@@ -2,8 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Models\FuturesSymbol;
-use App\Services\Binance\BinanceFuturesClient;
+use App\Services\Binance\FuturesSymbolSync;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -19,13 +18,9 @@ class SyncFuturesSymbols extends Command
      *
      * @throws RequestException|ConnectionException
      */
-    public function handle(BinanceFuturesClient $binance): int
+    public function handle(FuturesSymbolSync $symbols): int
     {
-        $contracts = $binance->perpetualContracts();
-
-        FuturesSymbol::syncFromContracts($contracts);
-
-        $this->components->info('Synced '.count($contracts).' Binance USDT perpetual symbols.');
+        $this->components->info('Synced '.$symbols->sync().' Binance USDT perpetual symbols.');
 
         return self::SUCCESS;
     }

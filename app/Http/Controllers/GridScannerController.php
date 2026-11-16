@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\GridSuggestionResource;
 use App\Jobs\RunGridScan;
+use App\Models\FuturesSymbol;
 use App\Models\GridScan;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,6 +26,7 @@ class GridScannerController extends Controller
             'isScanning' => GridScan::query()->where('status', GridScan::StatusRunning)->where('started_at', '>', now()->subMinutes(15))->exists(),
             'totalMargin' => $request->user()->total_margin,
             'rangeHorizonOptions' => config('grid.range_horizons'),
+            'symbols' => FuturesSymbol::tradingSymbols(),
             'suggestions' => GridSuggestionResource::collection($suggestions)->resolve($request),
         ]);
     }

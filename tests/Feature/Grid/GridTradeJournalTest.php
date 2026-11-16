@@ -6,12 +6,39 @@ use App\Enums\TradeSource;
 use App\Models\FuturesSymbol;
 use App\Models\GridTrade;
 use App\Models\User;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
+    Http::preventStrayRequests();
     FuturesSymbol::factory()->create(['symbol' => 'BTCUSDT', 'base_asset' => 'BTC']);
     FuturesSymbol::factory()->create(['symbol' => 'ETHUSDT', 'base_asset' => 'ETH']);
 });
+
+function fakeBinanceListing(): void
+{
+    Http::fake(['fapi.binance.com/fapi/v1/exchangeInfo' => Http::response(['symbols' => [
+        listedContract('BTCUSDT', 'BTC'),
+        listedContract('ETHUSDT', 'ETH'),
+        listedContract('NEWUSDT', 'NEW'),
+    ]])]);
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function listedContract(string $symbol, string $baseAsset): array
+{
+    return [
+        'symbol' => $symbol,
+        'baseAsset' => $baseAsset,
+        'quoteAsset' => 'USDT',
+        'contractType' => 'PERPETUAL',
+        'status' => 'TRADING',
+        'filters' => [['filterType' => 'PRICE_FILTER', 'tickSize' => '0.01']],
+    ];
+}
 
 /**
  * @return array<string, mixed>
@@ -143,6 +170,37 @@ it('journals a running trade with only the required fields', function () {
         ->and($trade->lower_price)->toBeNull();
 });
 
+it('loads the Binance symbols when none are stored yet', function () {
+    fakeBinanceListing();
+    FuturesSymbol::query()->delete();
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('grid-trades.index'))
+        ->assertInertia(fn (Assert $page) => $page->where('symbols', ['BTCUSDT', 'ETHUSDT', 'NEWUSDT']));
+});
+
+it('still opens the journal when Binance is unreachable and no symbols are stored', function () {
+    Sleep::fake();
+    Http::fake(['fapi.binance.com/*' => Http::response(['code' => -1000], 503)]);
+    FuturesSymbol::query()->delete();
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('grid-trades.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('symbols', []));
+});
+
+it('accepts a symbol Binance listed after the last sync', function () {
+    fakeBinanceListing();
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('grid-trades.store'), journalPayload(['symbol' => 'newusdt']))
+        ->assertSessionHasNoErrors();
+
+    expect($user->gridTrades()->sole()->symbol)->toBe('NEWUSDT');
+});
+
 it('journals a manual trade the scanner never suggested', function () {
     $user = User::factory()->create();
 
@@ -168,6 +226,7 @@ it('lists the trades journaled on a Binance symbol', function () {
 });
 
 it('rejects invalid trades', function (array $overrides, string $field) {
+    fakeBinanceListing();
     $user = User::factory()->create();
 
     $this->actingAs($user)
