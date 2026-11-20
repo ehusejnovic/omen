@@ -1,10 +1,12 @@
-export type GridMode = 'normal' | 'long' | 'short';
+export type GridMode = "normal" | "long" | "short";
 
-export type GridGrade = 'A+' | 'A' | 'B+' | 'B' | 'C+' | 'C';
+export type GridStrategy = "swing" | "volatile";
 
-export type TradeSource = 'scanner' | 'manual';
+export type GridGrade = "A+" | "A" | "B+" | "B" | "C+" | "C";
 
-export type EntryTrigger = 'immediate' | 'below' | 'above';
+export type TradeSource = "scanner" | "manual";
+
+export type EntryTrigger = "immediate" | "below" | "above";
 
 export type GridScan = {
     id: number;
@@ -27,7 +29,7 @@ export type GridSuggestion = {
     upper_price: number;
     range_width_pct: number;
     grid_count: number;
-    grid_type: 'arithmetic' | 'geometric';
+    grid_type: "arithmetic" | "geometric";
     grid_spacing_pct: number;
     profit_per_grid_pct: number;
     leverage: number;
@@ -58,7 +60,7 @@ export type GridSuggestion = {
         drift_per_day_pct: number;
         crossings_per_day: number;
         range_horizon_days?: number;
-        daily_trend?: 'bearish' | 'bullish' | 'neutral' | null;
+        daily_trend?: "bearish" | "bullish" | "neutral" | null;
         daily_ema20_slope_pct?: number | null;
         daily_close_vs_ema20_pct?: number | null;
         daily_return_30d_pct?: number | null;
@@ -79,6 +81,21 @@ export type GridSuggestion = {
         btc_shock_pct?: number | null;
         btc_shock_move_pct?: number | null;
         btc_shock_loss_pct?: number | null;
+        runtime_minutes?: number;
+        runtime_roi_pct?: number;
+        start_price?: number;
+        fair_value?: number;
+        daily_atr_pct?: number | null;
+        day_range_pct?: number;
+        day_low?: number;
+        day_high?: number;
+        box_low?: number;
+        box_high?: number;
+        box_ratio?: number;
+        contraction_ratio?: number;
+        runtime_sigma_pct?: number;
+        crossings?: number;
+        lean_signal?: number;
         score_breakdown: Record<string, number>;
     };
     reasons: string[];
@@ -162,7 +179,7 @@ export type AnalyticsRow = {
 };
 
 export type AnalyticsBreakdowns = Record<
-    'grade' | 'source' | 'leverage' | 'horizon' | 'duration' | 'mode',
+    "grade" | "source" | "leverage" | "horizon" | "duration" | "mode",
     AnalyticsRow[]
 >;
 

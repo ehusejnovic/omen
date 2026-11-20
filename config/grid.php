@@ -88,6 +88,54 @@ return [
 
     'keep_scans_for_days' => 7,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Volatile Grid Scanner
+    |--------------------------------------------------------------------------
+    |
+    | Short bots (up to `runtime_minutes`) on pairs with a large daily ATR once they stop
+    | trending and settle into a range. Runs every five minutes on 5m candles.
+    |
+    | A pair qualifies when its daily ATR is at least `min_daily_atr_pct` or the last 24h
+    | spanned at least `min_day_range_pct`. It counts as stabilizing when the average true
+    | range of the last hour is at most `max_contraction_ratio` of the busiest hour of the
+    | last day, and the last `runtime_minutes` fit in a box of at most `max_box_ratio` of
+    | the day's high-low range.
+    |
+    | The grid is centered on the start price, each side `range_sigma_min`–`range_sigma_max`
+    | standard deviations of the expected move over the runtime, stretched toward the day's
+    | extremes in between. Grid spacing is `spacing_multiplier` × the 5m ATR.
+    |
+    | Bots stay neutral unless the box drifts at least `lean_signal` standard deviations over
+    | the runtime with an efficiency ratio of at least `lean_efficiency`.
+    */
+    'volatile' => [
+        'symbols' => (int) env('GRID_VOLATILE_SYMBOLS', 150),
+        'min_quote_volume' => 20_000_000,
+        'results' => 15,
+        'kline_limit' => 300,
+        'daily_kline_limit' => 15,
+        'runtime_minutes' => 120,
+        'min_daily_atr_pct' => 8.0,
+        'min_day_range_pct' => 15.0,
+        'max_contraction_ratio' => 0.6,
+        'max_box_ratio' => 0.35,
+        'lean_signal' => 0.75,
+        'lean_efficiency' => 0.35,
+        'range_sigma_min' => 2.0,
+        'range_sigma_max' => 4.0,
+        'spacing_multiplier' => 0.8,
+        'max_grid_spacing' => 0.015,
+        'max_leverage' => 5,
+        'max_stop_loss' => 0.3,
+        // Share of margin the grid must be expected to earn over the runtime to be worth starting.
+        'min_runtime_roi' => 0.002,
+        'min_take_profit' => 0.01,
+        'max_take_profit' => 0.15,
+        'alert_cooldown_hours' => 2,
+        'keep_scans_for_hours' => 24,
+    ],
+
     'excluded_base_assets' => ['USDC', 'FDUSD', 'TUSD', 'BUSD', 'USDP', 'DAI', 'USDE', 'EUR', 'XUSD', 'USD1'],
 
 ];

@@ -46,7 +46,7 @@ class BinanceFuturesClient
     /**
      * 24 hour ticker statistics keyed by symbol.
      *
-     * @return array<string, array{last_price: float, quote_volume: float, price_change_pct: float}>
+     * @return array<string, array{last_price: float, quote_volume: float, price_change_pct: float, high_price: float, low_price: float}>
      *
      * @throws RequestException|ConnectionException
      */
@@ -57,6 +57,8 @@ class BinanceFuturesClient
                 'last_price' => (float) $ticker['lastPrice'],
                 'quote_volume' => (float) $ticker['quoteVolume'],
                 'price_change_pct' => (float) $ticker['priceChangePercent'],
+                'high_price' => (float) ($ticker['highPrice'] ?? $ticker['lastPrice']),
+                'low_price' => (float) ($ticker['lowPrice'] ?? $ticker['lastPrice']),
             ]])
             ->all();
     }

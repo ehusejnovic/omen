@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\GridStrategy;
 use App\Jobs\RunGridScan;
 use App\Models\GridScan;
 use App\Models\GridSuggestion;
@@ -75,7 +76,47 @@ it('queues a scan on demand', function () {
         ->post(route('grid-scans.store'))
         ->assertRedirect(route('dashboard'));
 
-    Queue::assertPushed(RunGridScan::class);
+    Queue::assertPushed(RunGridScan::class, fn (RunGridScan $job): bool => $job->strategy === GridStrategy::Swing);
+});
+
+it('shows each strategy\'s own latest scan and scanning state', function (?string $strategy, string $expectedStrategy, string $expectedSymbol, bool $expectsScanning) {
+    $swingScan = GridScan::factory()->create();
+    GridSuggestion::factory()->for($swingScan, 'scan')->create(['symbol' => 'SWINGUSDT']);
+    $volatileScan = GridScan::factory()->volatile()->create();
+    GridSuggestion::factory()->for($volatileScan, 'scan')->create(['symbol' => 'PUMPUSDT']);
+    GridScan::factory()->volatile()->running()->create();
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('dashboard', array_filter(['strategy' => $strategy])))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('strategy', $expectedStrategy)
+            ->where('isScanning', $expectsScanning)
+            ->has('suggestions', 1)
+            ->where('suggestions.0.symbol', $expectedSymbol));
+})->with([
+    'swing by default' => [null, 'swing', 'SWINGUSDT', false],
+    'volatile' => ['volatile', 'volatile', 'PUMPUSDT', true],
+    'unknown strategy falls back to swing' => ['bogus', 'swing', 'SWINGUSDT', false],
+]);
+
+it('queues a volatile scan on demand and returns to the volatile tab', function () {
+    Queue::fake([RunGridScan::class]);
+
+    $this->actingAs(User::factory()->create())
+        ->post(route('grid-scans.store'), ['strategy' => 'volatile'])
+        ->assertRedirect(route('dashboard', ['strategy' => 'volatile']));
+
+    Queue::assertPushed(RunGridScan::class, fn (RunGridScan $job): bool => $job->strategy === GridStrategy::Volatile);
+});
+
+it('rejects an unknown scan strategy', function () {
+    Queue::fake([RunGridScan::class]);
+
+    $this->actingAs(User::factory()->create())
+        ->post(route('grid-scans.store'), ['strategy' => 'bogus'])
+        ->assertSessionHasErrors('strategy');
+
+    Queue::assertNotPushed(RunGridScan::class);
 });
 
 it('redirects guests away from queueing a scan', function () {
