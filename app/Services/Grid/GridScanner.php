@@ -2,6 +2,7 @@
 
 namespace App\Services\Grid;
 
+use App\Enums\GridStrategy;
 use App\Models\AppSetting;
 use App\Models\FuturesSymbol;
 use App\Models\GridScan;
@@ -30,7 +31,7 @@ class GridScanner
      */
     public function scan(): ?GridScan
     {
-        return Cache::lock('grid-scan', 900)->get(fn (): GridScan => $this->run()) ?: null;
+        return Cache::lock(GridStrategy::Swing->lockName(), 900)->get(fn (): GridScan => $this->run()) ?: null;
     }
 
     /**
@@ -43,6 +44,7 @@ class GridScanner
         $rangeHorizonDays = AppSetting::rangeHorizonDays();
         $scan = GridScan::create([
             'status' => GridScan::StatusRunning,
+            'strategy' => GridStrategy::Swing,
             'spacing_multiplier' => $spacingMultiplier,
             'range_horizon_days' => $rangeHorizonDays,
             'started_at' => now(),

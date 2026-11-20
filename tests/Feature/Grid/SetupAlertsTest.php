@@ -96,3 +96,39 @@ it('sends nothing while Telegram is not configured', function () {
 
     Http::assertNothingSent();
 });
+
+it('alerts volatile setups apart from swing setups and again after the shorter volatile cooldown', function () {
+    Http::preventStrayRequests();
+    Http::fake([TelegramEndpoint => Http::response(['ok' => true])]);
+    configureTelegram();
+    config(['grid.volatile.alert_cooldown_hours' => 2]);
+    $this->freezeTime();
+    $volatileScan = function (): GridScan {
+        $scan = GridScan::factory()->volatile()->create();
+        GridSuggestion::factory()->for($scan, 'scan')->create([
+            'symbol' => 'BTCUSDT',
+            'grade' => GridGrade::A,
+            'metrics' => ['runtime_minutes' => 120, 'runtime_roi_pct' => 0.8, 'min_notional' => 5, 'tick_size' => 0.01, 'score_breakdown' => []],
+        ]);
+
+        return $scan;
+    };
+
+    app(SetupAlerts::class)->notify(scanWithSetup('BTCUSDT', GridGrade::A));
+    app(SetupAlerts::class)->notify($volatileScan());
+
+    Http::assertSentCount(2);
+    Http::assertSent(fn (Request $request): bool => str_contains($request['text'], 'Volatile A setup: BTCUSDT')
+        && str_contains($request['text'], 'Est. ROI over 120 min: 0.80%')
+        && str_contains($request['text'], 'Close within 120 min'));
+
+    $this->travel(119)->minutes();
+    app(SetupAlerts::class)->notify($volatileScan());
+
+    Http::assertSentCount(2);
+
+    $this->travel(1)->minutes();
+    app(SetupAlerts::class)->notify($volatileScan());
+
+    Http::assertSentCount(3);
+});

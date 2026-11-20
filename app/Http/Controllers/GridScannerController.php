@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\GridStrategy;
+use App\Http\Requests\GridScanRequest;
 use App\Http\Resources\GridSuggestionResource;
 use App\Jobs\RunGridScan;
 use App\Models\FuturesSymbol;
@@ -14,32 +16,41 @@ use Inertia\Response;
 class GridScannerController extends Controller
 {
     /**
-     * Show the suggestions from the latest completed scan.
+     * Show the suggestions from the latest completed scan of the chosen strategy.
      */
     public function index(Request $request): Response
     {
-        $latestScan = GridScan::query()->where('status', GridScan::StatusCompleted)->latest('id')->first();
+        $strategy = GridStrategy::tryFrom((string) $request->query('strategy')) ?? GridStrategy::Swing;
+        $latestScan = GridScan::query()->forStrategy($strategy)->where('status', GridScan::StatusCompleted)->latest('id')->first();
         $suggestions = $latestScan?->suggestions()->orderByDesc('score')->orderBy('symbol')->get() ?? collect();
 
         return Inertia::render('dashboard', [
+            'strategy' => $strategy,
             'scan' => $latestScan?->only(['id', 'symbols_scanned', 'suggestions_count', 'spacing_multiplier', 'range_horizon_days', 'started_at', 'finished_at']),
-            'isScanning' => GridScan::query()->where('status', GridScan::StatusRunning)->where('started_at', '>', now()->subMinutes(15))->exists(),
+            'isScanning' => GridScan::query()
+                ->forStrategy($strategy)
+                ->where('status', GridScan::StatusRunning)
+                ->where('started_at', '>', now()->subMinutes($strategy->staleAfterMinutes()))
+                ->exists(),
             'totalMargin' => $request->user()->total_margin,
             'rangeHorizonOptions' => config('grid.range_horizons'),
+            'runtimeMinutes' => config('grid.volatile.runtime_minutes'),
             'symbols' => FuturesSymbol::tradingSymbols(),
             'suggestions' => GridSuggestionResource::collection($suggestions)->resolve($request),
         ]);
     }
 
     /**
-     * Queue an immediate scan.
+     * Queue an immediate scan of the chosen strategy.
      */
-    public function store(): RedirectResponse
+    public function store(GridScanRequest $request): RedirectResponse
     {
-        RunGridScan::dispatch();
+        $strategy = $request->strategy();
+
+        RunGridScan::dispatch($strategy);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Scan queued. Results refresh when it finishes.')]);
 
-        return to_route('dashboard');
+        return to_route('dashboard', $strategy === GridStrategy::Swing ? [] : ['strategy' => $strategy->value]);
     }
 }

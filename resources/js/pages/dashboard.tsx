@@ -1,45 +1,89 @@
-import { Form, Head, Link, usePoll } from '@inertiajs/react';
-import { RefreshCw, Search, TriangleAlert } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
-import GridScannerController from '@/actions/App/Http/Controllers/GridScannerController';
-import { GradeBadge, ModeBadge } from '@/components/grid-badges';
-import GridTradeDialog from '@/components/grid-trade-dialog';
+import { Form, Head, Link, usePoll } from "@inertiajs/react";
+import { RefreshCw, Search, TriangleAlert } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import GridScannerController from "@/actions/App/Http/Controllers/GridScannerController";
+import { GradeBadge, ModeBadge } from "@/components/grid-badges";
+import GridTradeDialog from "@/components/grid-trade-dialog";
 import GridSuggestionSheet, {
     dailyTrendLabel,
     entryTriggerLabel,
-} from '@/components/grid-suggestion-sheet';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+    runtimeLabel,
+} from "@/components/grid-suggestion-sheet";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from '@/components/ui/select';
-import { Spinner } from '@/components/ui/spinner';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+} from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
     formatPct,
     formatPrice,
     formatRelative,
     formatUsdt,
-} from '@/lib/grid-format';
-import { cn } from '@/lib/utils';
-import { dashboard } from '@/routes';
-import { edit as editGridSettings } from '@/routes/grid-settings';
-import type { GridGrade, GridMode, GridScan, GridSuggestion } from '@/types';
+} from "@/lib/grid-format";
+import { cn } from "@/lib/utils";
+import { dashboard } from "@/routes";
+import { edit as editGridSettings } from "@/routes/grid-settings";
+import type {
+    GridGrade,
+    GridMode,
+    GridScan,
+    GridStrategy,
+    GridSuggestion,
+} from "@/types";
 
-const grades: GridGrade[] = ['A+', 'A', 'B+', 'B', 'C+', 'C'];
+const grades: GridGrade[] = ["A+", "A", "B+", "B", "C+", "C"];
 
-type ModeFilter = GridMode | 'all';
+type ModeFilter = GridMode | "all";
 
-function nextScanLabel(): string {
-    const minutes = 60 - new Date().getMinutes();
+const scanIntervalMinutes: Record<GridStrategy, number> = {
+    swing: 60,
+    volatile: 5,
+};
 
-    return minutes === 60 ? 'now' : `in ${minutes} min`;
+const strategyTabs: { value: GridStrategy; label: string }[] = [
+    { value: "swing", label: "Swing (3–7 days)" },
+    { value: "volatile", label: "Volatile (≤ 2h)" },
+];
+
+function nextScanLabel(strategy: GridStrategy): string {
+    const interval = scanIntervalMinutes[strategy];
+    const minutes = interval - (new Date().getMinutes() % interval);
+
+    return minutes === interval ? "now" : `in ${minutes} min`;
+}
+
+function StrategyTabs({ strategy }: { strategy: GridStrategy }) {
+    return (
+        <div className="inline-flex gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800">
+            {strategyTabs.map(({ value, label }) => (
+                <Link
+                    key={value}
+                    href={dashboard(
+                        value === "swing"
+                            ? undefined
+                            : { query: { strategy: value } },
+                    )}
+                    preserveScroll
+                    className={cn(
+                        "rounded-md px-3.5 py-1.5 text-sm transition-colors",
+                        strategy === value
+                            ? "bg-white shadow-xs dark:bg-neutral-700 dark:text-neutral-100"
+                            : "text-neutral-500 hover:bg-neutral-200/60 hover:text-black dark:text-neutral-400 dark:hover:bg-neutral-700/60",
+                    )}
+                >
+                    {label}
+                </Link>
+            ))}
+        </div>
+    );
 }
 
 function StatCard({
@@ -64,33 +108,48 @@ function StatCard({
     );
 }
 
-export default function Dashboard({
-    scan,
-    isScanning,
-    totalMargin,
-    rangeHorizonOptions,
-    symbols,
-    suggestions,
-}: {
+type ScannerProps = {
+    strategy: GridStrategy;
     scan: GridScan | null;
     isScanning: boolean;
     totalMargin: number;
     rangeHorizonOptions: number[];
+    runtimeMinutes: number;
     symbols: string[];
     suggestions: GridSuggestion[];
-}) {
-    const [mode, setMode] = useState<ModeFilter>('all');
-    const [minimumGrade, setMinimumGrade] = useState<GridGrade>('C');
-    const [query, setQuery] = useState('');
+};
+
+export default function Dashboard(props: ScannerProps) {
+    // Keyed by strategy so filters, the open sheet and the poll interval start fresh on each tab.
+    return <Scanner key={props.strategy} {...props} />;
+}
+
+function Scanner({
+    strategy,
+    scan,
+    isScanning,
+    totalMargin,
+    rangeHorizonOptions,
+    runtimeMinutes,
+    symbols,
+    suggestions,
+}: ScannerProps) {
+    const volatile = strategy === "volatile";
+    const runtime = runtimeLabel(runtimeMinutes);
+    const [mode, setMode] = useState<ModeFilter>("all");
+    const [minimumGrade, setMinimumGrade] = useState<GridGrade>("C");
+    const [query, setQuery] = useState("");
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [journaling, setJournaling] = useState<GridSuggestion | null>(null);
 
     const { start: startScanPoll, stop: stopScanPoll } = usePoll(
         10000,
-        { only: ['scan', 'isScanning', 'suggestions'] },
+        { only: ["scan", "isScanning", "suggestions"] },
         { autoStart: false },
     );
-    usePoll(300000, { only: ['scan', 'isScanning', 'suggestions'] });
+    usePoll(volatile ? 60000 : 300000, {
+        only: ["scan", "isScanning", "suggestions"],
+    });
 
     useEffect(() => {
         if (isScanning) {
@@ -106,16 +165,16 @@ export default function Dashboard({
 
         return suggestions.filter(
             (suggestion) =>
-                (mode === 'all' || suggestion.mode === mode) &&
+                (mode === "all" || suggestion.mode === mode) &&
                 grades.indexOf(suggestion.grade) <= gradeLimit &&
-                (search === '' || suggestion.symbol.includes(search)),
+                (search === "" || suggestion.symbol.includes(search)),
         );
     }, [suggestions, mode, minimumGrade, query]);
 
     const selected =
         suggestions.find((suggestion) => suggestion.id === selectedId) ?? null;
     const topCount = suggestions.filter((suggestion) =>
-        ['A+', 'A'].includes(suggestion.grade),
+        ["A+", "A"].includes(suggestion.grade),
     ).length;
     const modeCounts = suggestions.reduce<Record<GridMode, number>>(
         (counts, suggestion) => ({
@@ -130,31 +189,41 @@ export default function Dashboard({
             <Head title="Grid scanner" />
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                        <h1 className="text-xl font-semibold tracking-tight">
-                            Futures grid scanner
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Best {scan?.suggestions_count ?? 30} setups by grade
-                            from the top {scan?.symbols_scanned ?? 100} Binance
-                            USDⓈ-M perpetuals by volume, rescanned every hour.
-                            Suggestions only, no orders are placed.
-                        </p>
+                    <div className="space-y-3">
+                        <div>
+                            <h1 className="text-xl font-semibold tracking-tight">
+                                Futures grid scanner
+                            </h1>
+                            <p className="text-sm text-muted-foreground">
+                                {volatile
+                                    ? `Short bots of up to ${runtime} on highly volatile Binance USDⓈ-M perpetuals that have stopped trending and settled into a range, rescanned every 5 minutes. ${scan?.symbols_scanned ?? 0} volatile pairs checked in the last scan.`
+                                    : `Best ${scan?.suggestions_count ?? 30} setups by grade from the top ${scan?.symbols_scanned ?? 100} Binance USDⓈ-M perpetuals by volume, rescanned every hour.`}{" "}
+                                Suggestions only, no orders are placed.
+                            </p>
+                        </div>
+                        <StrategyTabs strategy={strategy} />
                     </div>
                     <Form {...GridScannerController.store.form()}>
                         {({ processing }) => (
-                            <Button
-                                type="submit"
-                                variant="outline"
-                                disabled={processing || isScanning}
-                            >
-                                {isScanning ? (
-                                    <Spinner />
-                                ) : (
-                                    <RefreshCw className="size-4" />
-                                )}
-                                {isScanning ? 'Scanning…' : 'Scan now'}
-                            </Button>
+                            <>
+                                <input
+                                    type="hidden"
+                                    name="strategy"
+                                    value={strategy}
+                                />
+                                <Button
+                                    type="submit"
+                                    variant="outline"
+                                    disabled={processing || isScanning}
+                                >
+                                    {isScanning ? (
+                                        <Spinner />
+                                    ) : (
+                                        <RefreshCw className="size-4" />
+                                    )}
+                                    {isScanning ? "Scanning…" : "Scan now"}
+                                </Button>
+                            </>
                         )}
                     </Form>
                 </div>
@@ -165,9 +234,13 @@ export default function Dashboard({
                         value={
                             scan?.finished_at
                                 ? formatRelative(scan.finished_at)
-                                : 'Never'
+                                : "Never"
                         }
-                        hint={`${scan?.spacing_multiplier ? `Spacing ${scan.spacing_multiplier}× ATR · ` : ''}${scan?.range_horizon_days ? `${scan.range_horizon_days}-day range · ` : ''}next scan ${nextScanLabel()}`}
+                        hint={
+                            volatile
+                                ? `Up to ${runtime} bots · next scan ${nextScanLabel(strategy)}`
+                                : `${scan?.spacing_multiplier ? `Spacing ${scan.spacing_multiplier}× ATR · ` : ""}${scan?.range_horizon_days ? `${scan.range_horizon_days}-day range · ` : ""}next scan ${nextScanLabel(strategy)}`
+                        }
                     />
                     <StatCard
                         label="Total margin"
@@ -228,8 +301,8 @@ export default function Dashboard({
                         <SelectContent>
                             {grades.map((grade) => (
                                 <SelectItem key={grade} value={grade}>
-                                    {grade === 'C'
-                                        ? 'All grades'
+                                    {grade === "C"
+                                        ? "All grades"
                                         : `${grade} and better`}
                                 </SelectItem>
                             ))}
@@ -262,9 +335,15 @@ export default function Dashboard({
                                 <th className="text-right">Grids</th>
                                 <th className="text-right">Leverage</th>
                                 <th className="text-right">Margin</th>
-                                <th>Entry trigger</th>
+                                <th>
+                                    {volatile ? "Start price" : "Entry trigger"}
+                                </th>
                                 <th className="text-right">TP / SL (PnL)</th>
-                                <th className="text-right">Est. daily ROI</th>
+                                <th className="text-right">
+                                    {volatile
+                                        ? `Est. ${runtime} ROI`
+                                        : "Est. daily ROI"}
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border/60">
@@ -287,13 +366,13 @@ export default function Dashboard({
                                                 {formatPrice(
                                                     suggestion.last_price,
                                                     tick,
-                                                )}{' '}
+                                                )}{" "}
                                                 <span
                                                     className={cn(
                                                         suggestion.price_change_24h_pct >=
                                                             0
-                                                            ? 'text-emerald-600 dark:text-emerald-400'
-                                                            : 'text-rose-600 dark:text-rose-400',
+                                                            ? "text-emerald-600 dark:text-emerald-400"
+                                                            : "text-rose-600 dark:text-rose-400",
                                                     )}
                                                 >
                                                     {formatPct(
@@ -308,7 +387,7 @@ export default function Dashboard({
                                             <ModeBadge mode={suggestion.mode} />
                                             {dailyTrendLabel(suggestion) && (
                                                 <div className="mt-1 text-xs text-muted-foreground">
-                                                    Daily:{' '}
+                                                    Daily:{" "}
                                                     {dailyTrendLabel(
                                                         suggestion,
                                                     )?.toLowerCase()}
@@ -318,8 +397,8 @@ export default function Dashboard({
                                                 suggestion.trailing_down) && (
                                                 <div className="text-xs text-muted-foreground">
                                                     {suggestion.trailing_up
-                                                        ? 'Trailing up'
-                                                        : 'Trailing down'}
+                                                        ? "Trailing up"
+                                                        : "Trailing down"}
                                                 </div>
                                             )}
                                         </td>
@@ -337,8 +416,8 @@ export default function Dashboard({
                                             {formatPrice(
                                                 suggestion.lower_price,
                                                 tick,
-                                            )}{' '}
-                                            –{' '}
+                                            )}{" "}
+                                            –{" "}
                                             {formatPrice(
                                                 suggestion.upper_price,
                                                 tick,
@@ -347,7 +426,7 @@ export default function Dashboard({
                                                 {formatPct(
                                                     suggestion.range_width_pct,
                                                     1,
-                                                )}{' '}
+                                                )}{" "}
                                                 wide
                                             </div>
                                         </td>
@@ -356,7 +435,7 @@ export default function Dashboard({
                                             <div className="text-xs text-muted-foreground">
                                                 {formatPct(
                                                     suggestion.profit_per_grid_pct,
-                                                )}{' '}
+                                                )}{" "}
                                                 / grid
                                             </div>
                                         </td>
@@ -385,6 +464,19 @@ export default function Dashboard({
                                                 suggestion,
                                                 tick,
                                             )}
+                                            {volatile &&
+                                                suggestion.metrics
+                                                    .fair_value !==
+                                                    undefined && (
+                                                    <div className="text-xs text-muted-foreground">
+                                                        Fair value{" "}
+                                                        {formatPrice(
+                                                            suggestion.metrics
+                                                                .fair_value,
+                                                            tick,
+                                                        )}
+                                                    </div>
+                                                )}
                                         </td>
                                         <td className="text-right tabular-nums">
                                             <span className="text-emerald-600 dark:text-emerald-400">
@@ -393,8 +485,8 @@ export default function Dashboard({
                                                     1,
                                                     true,
                                                 )}
-                                            </span>{' '}
-                                            /{' '}
+                                            </span>{" "}
+                                            /{" "}
                                             <span className="text-rose-600 dark:text-rose-400">
                                                 {formatPct(
                                                     suggestion.stop_loss_pnl_pct,
@@ -404,17 +496,20 @@ export default function Dashboard({
                                             <div className="text-xs text-muted-foreground">
                                                 {formatUsdt(
                                                     suggestion.take_profit_usdt,
-                                                )}{' '}
-                                                /{' '}
+                                                )}{" "}
+                                                /{" "}
                                                 {formatUsdt(
                                                     suggestion.stop_loss_usdt,
-                                                )}{' '}
+                                                )}{" "}
                                                 USDT
                                             </div>
                                         </td>
                                         <td className="text-right tabular-nums">
                                             {formatPct(
-                                                suggestion.estimated_daily_roi_pct,
+                                                volatile
+                                                    ? (suggestion.metrics
+                                                          .runtime_roi_pct ?? 0)
+                                                    : suggestion.estimated_daily_roi_pct,
                                                 2,
                                             )}
                                         </td>
@@ -428,8 +523,11 @@ export default function Dashboard({
                                         className="px-3 py-12 text-center text-muted-foreground"
                                     >
                                         {scan === null
-                                            ? 'No scan has finished yet. Run a scan to see suggestions.'
-                                            : 'No suggestions match these filters.'}
+                                            ? "No scan has finished yet. Run a scan to see suggestions."
+                                            : suggestions.length === 0 &&
+                                                volatile
+                                              ? "No volatile pair is stabilizing right now. The scanner checks again every 5 minutes."
+                                              : "No suggestions match these filters."}
                                     </td>
                                 </tr>
                             )}
@@ -440,6 +538,7 @@ export default function Dashboard({
 
             <GridSuggestionSheet
                 suggestion={selected}
+                strategy={strategy}
                 onOpenChange={(open) => !open && setSelectedId(null)}
                 onJournal={(suggestion) => {
                     setSelectedId(null);
@@ -461,7 +560,7 @@ export default function Dashboard({
 Dashboard.layout = {
     breadcrumbs: [
         {
-            title: 'Grid scanner',
+            title: "Grid scanner",
             href: dashboard(),
         },
     ],

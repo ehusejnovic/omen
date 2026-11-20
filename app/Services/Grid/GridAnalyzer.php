@@ -110,7 +110,7 @@ class GridAnalyzer
             : ($upper - $lower) / ($price * $targetSpacing));
         $gridCount = max((int) config('grid.min_grids'), min((int) config('grid.max_grids'), $gridCount));
 
-        $levels = $this->levels($lower, $upper, $gridCount, $geometric);
+        $levels = GridLevels::prices($lower, $upper, $gridCount, $geometric);
         $spacing = $geometric ? ($upper / $lower) ** (1 / $gridCount) - 1 : ($upper - $lower) / $gridCount / $price;
         $netGridProfit = $spacing - 2 * $fee;
 
@@ -119,11 +119,11 @@ class GridAnalyzer
         $breakoutUp = $upper + $breakoutBuffer;
         $qtyPerGrid = 1 / ($gridCount * $price);
         $lossAtOneX = match ($mode) {
-            GridMode::Long => -$this->unrealizedPnl($mode, $levels, $price, $breakoutDown, $qtyPerGrid),
-            GridMode::Short => -$this->unrealizedPnl($mode, $levels, $price, $breakoutUp, $qtyPerGrid),
+            GridMode::Long => -GridLevels::unrealizedPnl($mode, $levels, $price, $breakoutDown, $qtyPerGrid),
+            GridMode::Short => -GridLevels::unrealizedPnl($mode, $levels, $price, $breakoutUp, $qtyPerGrid),
             GridMode::Normal => max(
-                -$this->unrealizedPnl($mode, $levels, $price, $breakoutDown, $qtyPerGrid),
-                -$this->unrealizedPnl($mode, $levels, $price, $breakoutUp, $qtyPerGrid),
+                -GridLevels::unrealizedPnl($mode, $levels, $price, $breakoutDown, $qtyPerGrid),
+                -GridLevels::unrealizedPnl($mode, $levels, $price, $breakoutUp, $qtyPerGrid),
             ),
         };
         $lossAtOneX = max($lossAtOneX, 0.001);
@@ -177,7 +177,7 @@ class GridAnalyzer
             };
 
             foreach ($shockMoves as $move) {
-                $loss = -$this->unrealizedPnl($mode, $levels, $price, $price * (1 + max($move, -0.9)), $qtyPerGrid);
+                $loss = -GridLevels::unrealizedPnl($mode, $levels, $price, $price * (1 + max($move, -0.9)), $qtyPerGrid);
 
                 if ($shockLossAtOneX === null || $loss > $shockLossAtOneX) {
                     $shockLossAtOneX = $loss;
@@ -208,8 +208,8 @@ class GridAnalyzer
         $dailyRoi = $roundTripsPerDay * ($leverage / $gridCount) * $netGridProfit
             - 3 * $market['funding_rate'] * $leverage * $exposure;
         $trendProfit = match ($mode) {
-            GridMode::Long => $this->unrealizedPnl($mode, $levels, $price, $upper, $qtyPerGrid) * $leverage,
-            GridMode::Short => $this->unrealizedPnl($mode, $levels, $price, $lower, $qtyPerGrid) * $leverage,
+            GridMode::Long => GridLevels::unrealizedPnl($mode, $levels, $price, $upper, $qtyPerGrid) * $leverage,
+            GridMode::Short => GridLevels::unrealizedPnl($mode, $levels, $price, $lower, $qtyPerGrid) * $leverage,
             GridMode::Normal => 0.0,
         };
         $takeProfit = min(max($dailyRoi * $runtimeDays + 0.5 * $trendProfit * $trailingReach, 0.03), 1.5);
@@ -416,58 +416,6 @@ class GridAnalyzer
         $upper = max($middle + $halfWidth, $price + 0.25 * $halfWidth);
 
         return [$lower, $upper];
-    }
-
-    /**
-     * Grid line prices from the lower to the upper limit.
-     *
-     * @return list<float>
-     */
-    private function levels(float $lower, float $upper, int $gridCount, bool $geometric): array
-    {
-        $levels = [];
-
-        for ($i = 0; $i <= $gridCount; $i++) {
-            $levels[] = $geometric
-                ? $lower * ($upper / $lower) ** ($i / $gridCount)
-                : $lower + ($upper - $lower) * $i / $gridCount;
-        }
-
-        return $levels;
-    }
-
-    /**
-     * Estimated PnL in margin units at 1x when price travels from the start price to the exit price.
-     *
-     * Realized grid profit is ignored so the estimate stays conservative.
-     *
-     * @param  list<float>  $levels
-     */
-    private function unrealizedPnl(GridMode $mode, array $levels, float $startPrice, float $exitPrice, float $qtyPerGrid): float
-    {
-        $levelsAbove = array_filter($levels, fn (float $level): bool => $level > $startPrice);
-        $levelsBelow = array_filter($levels, fn (float $level): bool => $level < $startPrice);
-        $pnl = match ($mode) {
-            GridMode::Long => count($levelsAbove) * $qtyPerGrid * ($exitPrice - $startPrice),
-            GridMode::Short => count($levelsBelow) * $qtyPerGrid * ($startPrice - $exitPrice),
-            GridMode::Normal => 0.0,
-        };
-
-        if ($exitPrice < $startPrice) {
-            foreach ($levelsBelow as $level) {
-                if ($level >= $exitPrice) {
-                    $pnl += $qtyPerGrid * ($exitPrice - $level);
-                }
-            }
-        } else {
-            foreach ($levelsAbove as $level) {
-                if ($level <= $exitPrice) {
-                    $pnl += $qtyPerGrid * ($level - $exitPrice);
-                }
-            }
-        }
-
-        return $pnl;
     }
 
     /**

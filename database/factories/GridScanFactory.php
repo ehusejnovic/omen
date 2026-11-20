@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\GridStrategy;
 use App\Models\GridScan;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -19,6 +20,7 @@ class GridScanFactory extends Factory
     {
         return [
             'status' => GridScan::StatusCompleted,
+            'strategy' => GridStrategy::Swing,
             'symbols_scanned' => 100,
             'suggestions_count' => 100,
             'started_at' => now()->subMinute(),
@@ -35,6 +37,18 @@ class GridScanFactory extends Factory
             'status' => GridScan::StatusRunning,
             'started_at' => now(),
             'finished_at' => null,
+        ]);
+    }
+
+    /**
+     * Indicate that the scan looked for short bots on volatile, stabilizing pairs.
+     */
+    public function volatile(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'strategy' => GridStrategy::Volatile,
+            'spacing_multiplier' => null,
+            'range_horizon_days' => null,
         ]);
     }
 }

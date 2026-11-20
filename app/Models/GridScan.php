@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\GridStrategy;
 use Database\Factories\GridScanFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\MassPrunable;
@@ -14,6 +16,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property string $status
+ * @property GridStrategy $strategy
  * @property int $symbols_scanned
  * @property int $suggestions_count
  * @property float|null $spacing_multiplier
@@ -24,7 +27,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['status', 'symbols_scanned', 'suggestions_count', 'spacing_multiplier', 'range_horizon_days', 'error', 'started_at', 'finished_at'])]
+#[Fillable(['status', 'strategy', 'symbols_scanned', 'suggestions_count', 'spacing_multiplier', 'range_horizon_days', 'error', 'started_at', 'finished_at'])]
 class GridScan extends Model
 {
     /** @use HasFactory<GridScanFactory> */
@@ -44,6 +47,7 @@ class GridScan extends Model
     protected function casts(): array
     {
         return [
+            'strategy' => GridStrategy::class,
             'spacing_multiplier' => 'float',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
@@ -59,12 +63,29 @@ class GridScan extends Model
     }
 
     /**
-     * Get the prunable model query.
+     * Scans of one strategy.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function forStrategy(Builder $query, GridStrategy $strategy): void
+    {
+        $query->where('strategy', $strategy);
+    }
+
+    /**
+     * Get the prunable model query. Volatile scans run every few minutes, so they are kept for a shorter time.
      *
      * @return Builder<static>
      */
     public function prunable(): Builder
     {
-        return static::query()->where('created_at', '<', now()->subDays(config('grid.keep_scans_for_days')));
+        return static::query()->where(fn (Builder $query) => $query
+            ->where(fn (Builder $query) => $query
+                ->where('strategy', GridStrategy::Swing)
+                ->where('created_at', '<', now()->subDays(config('grid.keep_scans_for_days'))))
+            ->orWhere(fn (Builder $query) => $query
+                ->where('strategy', GridStrategy::Volatile)
+                ->where('created_at', '<', now()->subHours(config('grid.volatile.keep_scans_for_hours')))));
     }
 }
