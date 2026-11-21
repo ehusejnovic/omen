@@ -136,6 +136,13 @@ return [
         'keep_scans_for_hours' => 24,
     ],
 
+    // TradFi (tokenized equity) perpetuals are skipped by the volume ranking; these are always scanned on top of it.
+    'tradfi_symbols' => [
+        'SOXXUSDT', 'SOXLUSDT', 'SOXSUSDT', 'DRAMUSDT', 'IGVUSDT', 'ARTYUSDT',
+        'SPYUSDT', 'QQQUSDT', 'TQQQUSDT', 'SQQQUSDT', 'UVXYUSDT', 'SPCXUSDT',
+        'IBITUSDT', 'EWYUSDT', 'KORUUSDT', 'EWJUSDT', 'EWZSUSDT', 'EIDOUSDT',
+    ],
+
     'excluded_base_assets' => ['USDC', 'FDUSD', 'TUSD', 'BUSD', 'USDP', 'DAI', 'USDE', 'EUR', 'XUSD', 'USD1'],
 
 ];
