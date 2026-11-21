@@ -79,12 +79,14 @@ function fakeBinanceMarket(): void
             contract('ETHUSDT', 'ETH'),
             contract('USDCUSDT', 'USDC'),
             contract('BTCUSDT_261225', 'BTC', 'CURRENT_QUARTER'),
+            contract('SOXSUSDT', 'SOXS', 'TRADIFI_PERPETUAL'),
         ]]),
         'fapi.binance.com/fapi/v1/ticker/24hr' => Http::response([
             ticker('BTCUSDT', '9000000000'),
             ticker('ETHUSDT', '5000000000'),
             ticker('USDCUSDT', '8000000000'),
             ticker('BTCUSDT_261225', '7000000000'),
+            ticker('SOXSUSDT', '6000000000'),
         ]),
         'fapi.binance.com/fapi/v1/premiumIndex' => Http::response([
             ['symbol' => 'BTCUSDT', 'lastFundingRate' => '0.00010000'],
@@ -115,7 +117,8 @@ it('stores a suggestion for each perpetual whose candles loaded', function () {
         ->and($suggestion->metrics['min_notional'])->toEqual(100);
 
     Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'symbol=USDCUSDT')
-        || str_contains($request->url(), 'symbol=BTCUSDT_261225'));
+        || str_contains($request->url(), 'symbol=BTCUSDT_261225')
+        || str_contains($request->url(), 'symbol=SOXSUSDT'));
 });
 
 it('syncs the tradable perpetual symbols for the journal while scanning', function () {
@@ -126,7 +129,7 @@ it('syncs the tradable perpetual symbols for the journal while scanning', functi
     $this->artisan('grid:scan')->assertSuccessful();
 
     expect(FuturesSymbol::query()->where('is_trading', true)->orderBy('symbol')->pluck('symbol')->all())
-        ->toBe(['BTCUSDT', 'ETHUSDT', 'USDCUSDT'])
+        ->toBe(['BTCUSDT', 'ETHUSDT', 'SOXSUSDT', 'USDCUSDT'])
         ->and(FuturesSymbol::query()->find('GONEUSDT')->is_trading)->toBeFalse()
         ->and(FuturesSymbol::query()->find('BTCUSDT')->tick_size)->toBe(0.1);
 });

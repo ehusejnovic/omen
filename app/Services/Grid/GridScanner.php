@@ -56,6 +56,7 @@ class GridScanner
             $excluded = config('grid.excluded_base_assets');
 
             $symbols = collect($contracts)
+                ->reject(fn (array $contract): bool => $contract['tradfi'])
                 ->reject(fn (array $contract): bool => in_array($contract['base_asset'], $excluded, true))
                 ->keys()
                 ->filter(fn (string $symbol): bool => isset($tickers[$symbol]))
