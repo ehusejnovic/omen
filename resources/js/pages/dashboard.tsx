@@ -43,6 +43,8 @@ const grades: GridGrade[] = ["A+", "A", "B+", "B", "C+", "C"];
 
 type ModeFilter = GridMode | "all";
 
+type MarketFilter = "all" | "crypto" | "tradfi";
+
 const scanIntervalMinutes: Record<GridStrategy, number> = {
     swing: 60,
     volatile: 5,
@@ -137,6 +139,7 @@ function Scanner({
     const volatile = strategy === "volatile";
     const runtime = runtimeLabel(runtimeMinutes);
     const [mode, setMode] = useState<ModeFilter>("all");
+    const [market, setMarket] = useState<MarketFilter>("all");
     const [minimumGrade, setMinimumGrade] = useState<GridGrade>("C");
     const [query, setQuery] = useState("");
     const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -166,10 +169,12 @@ function Scanner({
         return suggestions.filter(
             (suggestion) =>
                 (mode === "all" || suggestion.mode === mode) &&
+                (market === "all" ||
+                    suggestion.is_tradfi === (market === "tradfi")) &&
                 grades.indexOf(suggestion.grade) <= gradeLimit &&
                 (search === "" || suggestion.symbol.includes(search)),
         );
-    }, [suggestions, mode, minimumGrade, query]);
+    }, [suggestions, mode, market, minimumGrade, query]);
 
     const selected =
         suggestions.find((suggestion) => suggestion.id === selectedId) ?? null;
@@ -286,6 +291,25 @@ function Scanner({
                         </ToggleGroupItem>
                         <ToggleGroupItem value="short" className="px-3">
                             Short
+                        </ToggleGroupItem>
+                    </ToggleGroup>
+
+                    <ToggleGroup
+                        type="single"
+                        variant="outline"
+                        value={market}
+                        onValueChange={(value) =>
+                            value && setMarket(value as MarketFilter)
+                        }
+                    >
+                        <ToggleGroupItem value="all" className="px-3">
+                            All markets
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="crypto" className="px-3">
+                            Crypto
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="tradfi" className="px-3">
+                            TradFi
                         </ToggleGroupItem>
                     </ToggleGroup>
 

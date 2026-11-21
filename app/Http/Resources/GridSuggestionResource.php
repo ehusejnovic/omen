@@ -24,6 +24,7 @@ class GridSuggestionResource extends JsonResource
         return [
             'id' => $this->id,
             'symbol' => $this->symbol,
+            'is_tradfi' => in_array($this->symbol, config('grid.tradfi_symbols'), true),
             'mode' => $this->mode,
             'grade' => $this->grade,
             'score' => $this->score,

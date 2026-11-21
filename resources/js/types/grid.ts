@@ -21,6 +21,7 @@ export type GridScan = {
 export type GridSuggestion = {
     id: number;
     symbol: string;
+    is_tradfi: boolean;
     mode: GridMode;
     grade: GridGrade;
     score: number;

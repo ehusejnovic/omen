@@ -59,6 +59,22 @@ it('flags suggestions whose grid orders fall below the Binance minimum notional'
             ->where('suggestions.0.below_min_notional', true));
 });
 
+it('flags TradFi suggestions so the scanner can filter them', function () {
+    config(['grid.tradfi_symbols' => ['SPYUSDT']]);
+    $user = User::factory()->create();
+    $scan = GridScan::factory()->create();
+    GridSuggestion::factory()->for($scan, 'scan')->create(['symbol' => 'SPYUSDT', 'score' => 90]);
+    GridSuggestion::factory()->for($scan, 'scan')->create(['symbol' => 'BTCUSDT', 'score' => 40]);
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('suggestions.0.symbol', 'SPYUSDT')
+            ->where('suggestions.0.is_tradfi', true)
+            ->where('suggestions.1.symbol', 'BTCUSDT')
+            ->where('suggestions.1.is_tradfi', false));
+});
+
 it('renders an empty scanner before the first scan finishes', function () {
     GridScan::factory()->running()->create();
 
