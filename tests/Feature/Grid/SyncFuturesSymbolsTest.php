@@ -20,12 +20,13 @@ function exchangeSymbol(string $symbol, string $baseAsset, string $status = 'TRA
     ];
 }
 
-it('stores the tradable USDT perpetuals and marks delisted symbols without losing their trades', function () {
+it('stores the tradable USDT perpetuals including TradFi ones and marks delisted symbols without losing their trades', function () {
     Http::preventStrayRequests();
     Http::fake([
         'fapi.binance.com/fapi/v1/exchangeInfo' => Http::response(['symbols' => [
             exchangeSymbol('SOLUSDT', 'SOL'),
             exchangeSymbol('DOGEUSDT', 'DOGE'),
+            exchangeSymbol('SOXSUSDT', 'SOXS', 'TRADING', 'TRADIFI_PERPETUAL'),
             exchangeSymbol('HALTUSDT', 'HALT', 'SETTLING'),
             exchangeSymbol('SOLUSDT_261225', 'SOL', 'TRADING', 'CURRENT_QUARTER'),
         ]]),
@@ -34,7 +35,7 @@ it('stores the tradable USDT perpetuals and marks delisted symbols without losin
 
     $this->artisan('grid:sync-symbols')->assertSuccessful();
 
-    expect(FuturesSymbol::query()->where('is_trading', true)->orderBy('symbol')->pluck('symbol')->all())->toBe(['DOGEUSDT', 'SOLUSDT'])
+    expect(FuturesSymbol::query()->where('is_trading', true)->orderBy('symbol')->pluck('symbol')->all())->toBe(['DOGEUSDT', 'SOLUSDT', 'SOXSUSDT'])
         ->and(FuturesSymbol::query()->find('SOLUSDT'))
         ->base_asset->toBe('SOL')
         ->tick_size->toBe(0.001)

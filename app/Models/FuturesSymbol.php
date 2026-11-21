@@ -59,7 +59,7 @@ class FuturesSymbol extends Model
     /**
      * Store the currently tradable contracts and mark every other known symbol as no longer trading.
      *
-     * @param  array<string, array{base_asset: string, tick_size: float, min_notional: float}>  $contracts
+     * @param  array<string, array{base_asset: string, tick_size: float, min_notional: float, tradfi: bool}>  $contracts
      */
     public static function syncFromContracts(array $contracts): void
     {

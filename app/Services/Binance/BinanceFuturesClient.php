@@ -16,9 +16,9 @@ use Throwable;
 class BinanceFuturesClient
 {
     /**
-     * Tradable USDT-margined perpetual contracts keyed by symbol.
+     * Tradable USDT-margined perpetual contracts keyed by symbol, including TradFi (tokenized equity) perpetuals.
      *
-     * @return array<string, array{base_asset: string, tick_size: float, min_notional: float}>
+     * @return array<string, array{base_asset: string, tick_size: float, min_notional: float, tradfi: bool}>
      *
      * @throws RequestException|ConnectionException
      */
@@ -27,7 +27,7 @@ class BinanceFuturesClient
         $contracts = [];
 
         foreach ($this->request()->get('/fapi/v1/exchangeInfo')->throw()->collect('symbols') as $symbol) {
-            if ($symbol['contractType'] !== 'PERPETUAL' || $symbol['quoteAsset'] !== 'USDT' || $symbol['status'] !== 'TRADING') {
+            if (! in_array($symbol['contractType'], ['PERPETUAL', 'TRADIFI_PERPETUAL'], true) || $symbol['quoteAsset'] !== 'USDT' || $symbol['status'] !== 'TRADING') {
                 continue;
             }
 
@@ -37,6 +37,7 @@ class BinanceFuturesClient
                 'base_asset' => $symbol['baseAsset'],
                 'tick_size' => (float) ($filters['PRICE_FILTER']['tickSize'] ?? 0),
                 'min_notional' => (float) ($filters['MIN_NOTIONAL']['notional'] ?? 5),
+                'tradfi' => $symbol['contractType'] === 'TRADIFI_PERPETUAL',
             ];
         }
 
