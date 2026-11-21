@@ -79,14 +79,14 @@ function fakeBinanceMarket(): void
             contract('ETHUSDT', 'ETH'),
             contract('USDCUSDT', 'USDC'),
             contract('BTCUSDT_261225', 'BTC', 'CURRENT_QUARTER'),
-            contract('SOXSUSDT', 'SOXS', 'TRADIFI_PERPETUAL'),
+            contract('TSLAUSDT', 'TSLA', 'TRADIFI_PERPETUAL'),
         ]]),
         'fapi.binance.com/fapi/v1/ticker/24hr' => Http::response([
             ticker('BTCUSDT', '9000000000'),
             ticker('ETHUSDT', '5000000000'),
             ticker('USDCUSDT', '8000000000'),
             ticker('BTCUSDT_261225', '7000000000'),
-            ticker('SOXSUSDT', '6000000000'),
+            ticker('TSLAUSDT', '6000000000'),
         ]),
         'fapi.binance.com/fapi/v1/premiumIndex' => Http::response([
             ['symbol' => 'BTCUSDT', 'lastFundingRate' => '0.00010000'],
@@ -118,7 +118,37 @@ it('stores a suggestion for each perpetual whose candles loaded', function () {
 
     Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'symbol=USDCUSDT')
         || str_contains($request->url(), 'symbol=BTCUSDT_261225')
-        || str_contains($request->url(), 'symbol=SOXSUSDT'));
+        || str_contains($request->url(), 'symbol=TSLAUSDT'));
+});
+
+it('scans the configured TradFi perpetuals on top of the crypto volume ranking', function () {
+    Http::preventStrayRequests();
+    config(['grid.symbols' => 1, 'grid.tradfi_symbols' => ['SPYUSDT', 'GONEUSDT']]);
+    Http::fake([
+        'fapi.binance.com/fapi/v1/exchangeInfo' => Http::response(['symbols' => [
+            contract('BTCUSDT', 'BTC'),
+            contract('SOLUSDT', 'SOL'),
+            contract('SPYUSDT', 'SPY', 'TRADIFI_PERPETUAL'),
+            contract('QQQUSDT', 'QQQ', 'TRADIFI_PERPETUAL'),
+        ]]),
+        'fapi.binance.com/fapi/v1/ticker/24hr' => Http::response([
+            ticker('BTCUSDT', '9000000000'),
+            ticker('SOLUSDT', '5000000000'),
+            ticker('SPYUSDT', '1000'),
+            ticker('QQQUSDT', '9900000000'),
+        ]),
+        'fapi.binance.com/fapi/v1/premiumIndex' => Http::response([]),
+        'fapi.binance.com/fapi/v1/klines*' => Http::response(rangingKlineRows()),
+    ]);
+
+    $this->artisan('grid:scan')->assertSuccessful();
+
+    expect(GridScan::query()->sole()->symbols_scanned)->toBe(2);
+
+    Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'symbol=SPYUSDT'));
+    Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'symbol=QQQUSDT')
+        || str_contains($request->url(), 'symbol=SOLUSDT')
+        || str_contains($request->url(), 'symbol=GONEUSDT'));
 });
 
 it('syncs the tradable perpetual symbols for the journal while scanning', function () {
@@ -129,7 +159,7 @@ it('syncs the tradable perpetual symbols for the journal while scanning', functi
     $this->artisan('grid:scan')->assertSuccessful();
 
     expect(FuturesSymbol::query()->where('is_trading', true)->orderBy('symbol')->pluck('symbol')->all())
-        ->toBe(['BTCUSDT', 'ETHUSDT', 'SOXSUSDT', 'USDCUSDT'])
+        ->toBe(['BTCUSDT', 'ETHUSDT', 'TSLAUSDT', 'USDCUSDT'])
         ->and(FuturesSymbol::query()->find('GONEUSDT')->is_trading)->toBeFalse()
         ->and(FuturesSymbol::query()->find('BTCUSDT')->tick_size)->toBe(0.1);
 });

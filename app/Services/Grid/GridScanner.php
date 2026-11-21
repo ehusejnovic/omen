@@ -55,16 +55,18 @@ class GridScanner
             $fundingRates = $this->binance->fundingRates();
             $excluded = config('grid.excluded_base_assets');
 
-            $symbols = collect($contracts)
+            $cryptoSymbols = collect($contracts)
                 ->reject(fn (array $contract): bool => $contract['tradfi'])
                 ->reject(fn (array $contract): bool => in_array($contract['base_asset'], $excluded, true))
                 ->keys()
                 ->filter(fn (string $symbol): bool => isset($tickers[$symbol]))
                 ->sortByDesc(fn (string $symbol): float => $tickers[$symbol]['quote_volume'])
-                ->take(config('grid.symbols'))
-                ->values()
-                ->all();
-            $symbols = array_values($symbols);
+                ->take(config('grid.symbols'));
+
+            $tradfiSymbols = collect(config('grid.tradfi_symbols'))
+                ->filter(fn (string $symbol): bool => ($contracts[$symbol]['tradfi'] ?? false) && isset($tickers[$symbol]));
+
+            $symbols = $cryptoSymbols->merge($tradfiSymbols)->unique()->values()->all();
 
             $candles = $this->binance->closedCandles(
                 array_values(array_unique([...$symbols, BtcSensitivity::Benchmark])),
